@@ -1,0 +1,285 @@
+import re
+
+doc_content = """
+﻿TOEFL Reading - Complete the Words - Generation (First batch), 09.05.25
+
+
+1. 
+
+
+Geopolitics of the United States studies how geography, resources, and power shape national foreign policy. It involves strategic access to markets, naval bases, energy supplies, alliances, economic sanctions, and military presence across global regions and influence. For example, control of shipping lanes and alliances in the Pacific and Atlantic affects economic growth, defense planning, and diplomatic priorities, implying that domestic policy and geography shape international outcomes over time and across regions globally.
+
+
+Geopolitics of the United States studies how geography, resources, and power shape national foreign policy. It invo{missing} strategic acc{missing} to mark{missing} naval bas{missing} energy suppl{missing} alliances, econ{missing} sanctions, an{missing} military pres{missing} across glo{missing} regions an{missing} influence.  For example, control of shipping lanes and alliances in the Pacific and Atlantic affects economic growth, defense planning, and diplomatic priorities, implying that domestic policy and geography shape international outcomes over time and across regions globally.[a]
+
+
+2. 
+Oral storytelling traditions are culturally transmitted narratives shared by communities through spoken language, often performed by designated storytellers or elders. They preserve history, teach values, and adapt to social changes while relying on memory, performance, communal participation, and repetition techniques. For exam[b]ple, storytellers can influence community identity and historical understanding across generations, affect social norms and moral education, provide practical knowledge, and help communities adapt to external pressures and changing environme[c]nts.
+
+
+Oral storytelling traditions are culturally transmitted narratives shared by communities through spoken language, often performed by designated storytellers or elders. They pres{missing} history, tea{missing} values, an{missing} adapt t{missing} social chan{missing} while rely{missing} on memo{missing} performance, comm{missing} participation, an{missing} repetition techni{missing}  For example, storytellers can influence community identity and historical understanding across generations, affect social norms and moral education, provide practical knowledge, and help communities adapt to external pressures and changing environments.
+
+
+3. 
+The radio is an electronic device that transmits and receives audio signals through electromagnetic waves. It uses modulation to carry voice and music over long distances and enables broadcasting to wide audiences at low cost. For example, radio has supported emergency alerts, informed rural communities, and shaped cultural exchange, and its continuing evolution affects media policy, communication infrastructure, and public access t[d]o information worldwide while remaining affordable and reliable for many populations globally over time[e][f].
+
+
+The radio is an electronic device that transmits and receives audio signals through electromagnetic waves. It us{missing} modulation t{missing} carry voi{missing} and mus{missing} over lo{missing} distances an{missing} enables broadc{missing} to wi{missing} audiences a{missing} low cos{missing}  For example, radio has supported emergency alerts, informed rural communities, and shaped cultural exchange, and its continuing evolution affects media policy, communication infrastructure, and public access to information worldwide while remaining affordable and reliable for many populations globally over time.
+
+
+4. 
+Tides are the periodic rise and fall of ocean water driven primarily by the Moon's gravitational attraction and the rotation of the Earth, with additional influence from the Sun and local coastal geography. The Moon pulls water toward it and causes bulges; inertial and centrifugal effects produce corresponding bulges on the opposite side[g][h]. Predictable timing and amplitude differences mean that local charts and long term observations are necessary for safe navigation, habitat management, and flood risk assessment.
+
+
+Tides are the periodic rise and fall of ocean water driven primarily by the Moon's gravitational attraction and the rotation of the Earth, with additional influence from the Sun and local coastal geography. The Mo[i]{missing} pulls wat{missing} toward i{missing} and cau{missing} bulges; iner{missing} and centri{missing} effects prod{missing} corresponding bul{missing} on th{missing} opposite sid{missin[j]g}  Predictable timing and amplitude differences mean that local charts and long term observations are necessary for safe navigation, habitat management, and flood risk assessment.
+5. 
+Logic and reasoning are fields of study that define rules for drawing correct conclusions from premises, analyze argument structure, and provide tools to evaluate clarity and coherence in thinking. They apply deduction induction and probabilistic reasoning use formal languages test claims identify fallacies measure evidence assess strength refine conclusions. For example, in law and science, logical analysis helps practitioners form testable hypotheses, resolve disputes through evidence, and refine theoretical models.
+
+
+Logic and reasoning are fields of study that define rules for drawing correct conclusions from premises, analyze argument structure, and provide tools to evaluate clarity and coherence in thinking. They app{missing} deduction induc{missing} and probabi{missing} reasoning us{missing} formal langu{missing} test cla{missing} identify falla{missing} measure evid{missing} assess stre{missing} refine conclu{missing}  For example, in law and science, logical analysis helps practitioners form testable hypotheses, resolve disputes through evidence, and refine theoretical models.[k][l]
+
+
+6. 
+Ocean acidification is the ongoing decrease in seawater pH caused primarily by uptake of carbon dioxide from the atmosphere. Carbon dioxide reacts with water to form carbonic acid, reducing carbonate ion availabi[m]lity and weakening shells and coral skeletons worldwide. This trend can harm fisheries, alter marine ecosystems, reduce biodiversity, threaten food security for coastal communities, and increase economic losses, so long term monitoring, policy measures, and emission reductions are necessary to protect ocean health and human livelihoods.
+
+
+Ocean acidification is the ongoing decrease in seawater pH caused primarily by uptake of carbon dioxide from the atmosphere. Carbon diox{missing} reacts wi{missing} water t{missing} form carb{missing} acid, redu{missing} carbonate io{missing} availability an{missing} weakening she{missing} and cor{missing} skeletons world{missing}  This trend can harm fisheries, alter marine ecosystems, reduce biodiversity, threaten food security for coastal communities, and increase economic losses, so long term monitoring, policy measures, and emission reductions are necessary to protect ocean health and human livelihoods.
+7. 
+Stress is a physiological and psychological response to perceived demands or threats in the environment. Chronic stress alters hormone balance, weakens immunity, increases inflammation, raises blood pressure, impairs concentration, and can promote unhealthy coping behaviors. For example, prolonged stress contributes to hypertension, metabolic changes, and behavioral risk factors that increase the likelihood of cardiovascular disease and diabetes, so identifying stressors and adopting coping strategies and lifestyle changes can improve long-term health outcomes[n][o].
+
+
+Stress is a physiological and psychological response to perceived demands or threats in the environment. Chronic str{missing} alters horm[p]{missing} balance, weak{missing} immunity, incre{missing} inflammation, rai{missing} blood press{missing} impairs concent{missing} and ca{missing} promote unhea{missing} coping behav{missi[q]ng}  For example, prolonged stress contributes to hypertension, metabolic changes, and behavioral risk factors that increase the likelihood of cardiovascular disease and diabetes, so identifying stressors and adopting coping strategies and lifestyle changes can improve long-term health outcomes.
+8. 
+A museum is an institution that collects, preserves, and displays objects of cultural, historical, or scientific significance. Staff catalog artifacts, regulate environment, record provenance, and coordinate loans; curators develop displays, research collections, and enable access for scholars. For example, by conserving artifacts, supporting research, offering educational programs, and collaborating with communities, museums promote cultural continuity, inform public understanding of the past, and contribute practical resources for preservation and future study and support global scholarly netwo[r]rks[s].
+
+
+A museum is an institution that collects, preserves, and displays objects of cultural, historical, or scientific significance. Staff cata{missing} artifacts, regu{missing} environment, rec{missing} provenance, an{missing} coordinate loa{missing} curators deve{missing} displays, rese{missing} collections, an{missing} enable acc{missing} for schol{missing}  For example, by conserving artifacts, supporting research, offering educational programs, and collaborating with communities, museums promote cultural continuity, inform public understanding of the past, and contribute practical resources for preservation and future study and support global scholarly networks.
+9. 
+Photog[t]raphy is a process of recording images by capturing light. Early methods used chemical reactions and lenses to fix images on metal or paper. They enabled documentation and scientific study. As a result, photography transformed communication, preserved historical evidence, supported artistic expression, and expanded research methods in fields such as medicine, astronomy, and anthropology, making visual information broadly accessible for education and public discourse while influencing social movements and commerce worldwide[u].
+
+
+Photography is a process of recording images by capturing light. Early meth{missing} used chem{missing} reactions an{missing} lenses t{missing} fix ima{missing} on met{missing} or pap{missing} They enab{missing} documentation an{missing} scientific stu{missing}  As a result, photography transformed communication, preserved historical evidence, supported artistic expression, and expanded research methods in fields such as medicine, astronomy, and anthropology, making visual information broadly accessible for education and public discourse while influencing social movements and commerce worldwide.
+
+
+10. 
+
+
+Ancient Roman aqueducts were engineered systems of channels, tunnels, and bridges that carried water from rural sources to urban centers for public and private use. They relied on gravity, employed precise gradients, and used durable materials such as stone and concrete to ensure steady flow. Their construction supported public baths, fountains, and irrigation, shaped urban planning, and demonstrated Roman skill in civil engineering, influencing water infrastructure designs in later civilizatio[v]ns.
+
+
+Ancient Roman aqueducts were engineered systems of channels, tunnels, and bridges that carried water from rural sources to urban centers for public and private use. They rel{missing} on grav{missing} employed prec{missing} gradients, an{missing} used dura{missing} materials su{missing} as sto{missing} and conc{missing} to ens{missing} steady flo{missing}  Their construction supported public baths, fountains, and irrigation, shaped urban planning, and demonstrated Roman skill in civil engineering, influencing water infrastructure designs in later civilizations.
+11. 
+Gothic architecture is a medieval European building style characterized by pointed arches and large stained glass windows. It used flying buttresses, ribbed vaults, tall spires, and intricate stone carving to increase height and light and enhance acoustics. A notable example is Notre-Dame in Paris, where soaring vaults and colorful glass serve religious functions, attract visitors, influence later architectural movements, demonstrate technological achievement, shape urban identity, and motivate preservation and study of historic buildi[w]ngs.
+
+
+Gothic architecture is a medieval European building style characterized by pointed arches and large stained glass windows. It us{missing} flying buttre{missing} ribbed vaul{missing} tall spir{missing} and intri{missing} stone carv{missing} to incr{missing} height an{missing} light an{missing} enhance acous{missing}  A notable example is Notre-Dame in Paris, where soaring vaults and colorful glass serve religious functions, attract visitors, influence later architectural movements, demonstrate technological achievement, shape urban identity, and motivate preservation and study of historic buildings.
+12. 
+Tides are the regular rising and falling of ocean water caused primarily by the Moon's gravity and the relative positions of Earth, Moon, and Sun. The Moon's gravity creates bulges in Earth's oceans as the planet rotates, producing high and low tides on predictable cycles. Coastal communities and marine operators use tide tables, forecasts, and modeling tools to plan navigation, fishing, construction, and shore managemen[x]t for safety and resource protection.
+
+
+Tides are the regular rising and falling of ocean water caused primarily by the Moon's gravity and the relative positions of Earth, Moon, and Sun. The Moo{missing} gravity crea{missing} bulges i{missing} Earth's oce{missing} as th{missing} planet rota{missing} producing hi{missing} and lo{missing} tides o{missing} predictable cycl{missing}  Coastal communities and marine operators use tide tables, forecasts, and modeling tools to plan navigation, fishing, construction, and shore management for safety and resource protection.
+13. 
+Artificial intelligence is the design of computer systems that can perform tasks normally requiring human intelligence. It uses algorithms and large data sets to learn patterns, make decisions, and gradually improve performance with feedback from experience. For example, AI applications include speech recognition, medical diagnosis, autonomous vehicles, and personalized learning systems; these technologies can increase efficiency, reduce errors, and expand access to information and services, but they also raise questions about privacy, fairness, and employment impacts.
+
+
+Artificial intelligence is the design of computer systems that can perform tasks normally requiring human intelligence. It us{missing} algorithms an{missing} large da{missing} sets t{missing} learn patte{missing} make decis{missing} and gradu{missing} improve perfor{missing} with feed{missing} from experi{missing}  For example, AI applications include speech recognition, medical diagnosis, autonomous vehicles, and personalized learning systems; these technologies can increase efficiency, reduce errors, and expand access to information and services, but they also raise questions about privacy, fairness, and employment impacts.
+14. 
+Cinema is the art and technology of recording, producing, and projecting motion pictures for public viewing, combining visual images, sound, narrative structure, and audience display systems to communicate information and enterta[y]inment. Early films used simple cameras, short scenes, fixed cameras, and basic editing to tell brief narratives and record events daily. For exam[z]ple, the early innovation of narrative films led to the development of feature-length storytelling and influenced visual culture worldwide.
+
+
+Cinema is the art and technology of recording, producing, and projecting motion pictures for public viewing, combining visual images, sound, narrative structure, and audience display systems to communicate information and entertainment. Early fil{missing} used sim{missing} cameras, sho{missing} scenes, fix{missing} cameras, an{missing} basic edit{missing} to te{missing} brief narra{missing} and rec{missing} events dai{missing}  For example, the early innovation of narrative films led to the development of feature-length storytelling and influenced visual culture worldwide.
+
+
+15. 
+Food chains and food webs describe how energy and nutrients move through ecosystems, showing who eats whom and how species are interconnected. Primary producers form the base, consumers occupy higher levels, and decomposers return matter to the soil completing nutrient cycles efficiently. Unde[aa]rstanding these relationships helps ecologists predict effects of species loss, manage habitats, and maintain biodiversity by recognizing key organisms and the links that support ecosystem stability over time.
+
+
+Food chains and food webs describe how energy and nutrients move through ecosystems, showing who eats whom and how species are interconnected. Primary produ{missing} form th{missing} base, consu{missing} occupy hig{missing} levels, an{missing} decomposers ret{missing} matter t{missing} the so{missing} completing nutr{missing} cycles effici{missing}  Understanding these relationships helps ecologists predict effects of species loss, manage habitats, and maintain biodiversity by recognizing key organisms and the links that support ecosystem stability over time.
+16. 
+Extinct species discovered through fossils are organisms that lived in the past but no longer exist today, and their preserved remains provide direct evidence of ancient life. Fossils form when organisms die and get buried in sediments. Paleontologists use these remains to reconstruct past ecosystems and evolution. Such discoveries help scientists understand biodiversity changes over geological time, inform models of extinction causes, and guide modern conservation strategies and policy today.
+
+
+Extinct species discovered through fossils are organisms that lived in the past but no longer exist today, and their preserved remains provide direct evidence of ancient life. Fossils fo{missing} when organ{missing} die an{missing} get bur{missing} in sedim{missing} Paleontologists us{missing} these rema{missing} to recons{missing} past ecosy{missing} and evolu{missing}  Such discoveries help scientists understand biodiversity changes over geological time, inform models of extinction causes, and guide modern conservation strategies and policy today.
+17. 
+A radio is an electronic device that transmits and receives audio signals wirelessly using electromagnetic waves. It uses modulation such as amplitude or frequency to encode voice and music for broadcast across national and local distances. For example, community radio stations broadcast local news, cultural programs, educational content, and weather reports, which can support civic engagement, education, and public safety, especially in remote regions where other communication infrastructures are unreliable or nonexistent, making radio services vita[ab]l.
+
+
+A radio is an electronic device that transmits and receives audio signals wirelessly using electromagnetic waves. It us{missing} modulati[ac]on su{missing} as ampli{miss[ad]ing} or frequ{missing} to enc{missing} voice an{missing} music fo{missing} broadcast acr{missing} national an{missing} local dista{missing}  For example, community radio stations broadcast local news, cultural programs, educational content, and weather reports, which can support civic engagement, education, and public safety, especially in remote regions where other communication infrastructures are unreliable or nonexistent, making radio services vital.
+
+
+18. 
+Aging is the gradual biological process that leads to functional decline over time and alters cellular, physiological, and systemic functions in organisms and contributes to increased disease susceptibility. Cells accumulate molecular damage, repair systems decline, and chronic inflammation increases risk for tissue deterioration across many organs and functions. For example, age-related muscle loss and reduced bone density can lower mobility, increase fall risk, and impair independence and quality of life for many older adults.
+
+
+Aging is the gradual biological process that leads to functional decline over time and alters cellular, physiological, and systemic functions in organisms and contributes to increased disease susceptibility. Cells accum{missing} molecular dama{missing} repair syst{missing} decline, an{missing} chronic inflam{missing} increases ri{missing} for tis{missing} deterioration acr{missing} many org{missing} and funct{miss[ae]ing}  For example, age-related muscle loss and reduced bone density can lower mobility, increase fall risk, and impair independence and quality of life for many older adults.
+________________
+19. 
+
+
+Skin an[af]d touch sensitivity refers to the skin's ability to detect stimuli such as pressure, temperature, vibration, and pain, allowing organisms to perceive texture, identify objects, and respond to potential harm. Nerve endings transmit signals to the spinal c[ag]ord and brain, and specialized receptors vary across body regions with differing den[ah]sities. This variation explains why fingertips are more sensitive than the back, affecting tool use, safety, and medical assessment procedures.
+
+
+Skin and touch sensitivity refers to the skin's ability to detect stimuli such as pressure, temperature, vibration, and pain, allowing organisms to perceive texture, identify objects, and respond to potential harm. Nerve endi{missing} transmit sign{missing} to th{missing} spinal co{missing} and bra{missing} and specia{missing} receptors va{missing} across bo{missing} regions wi{missing} differing densi{missing}  This variation explains why fingertips are more sensitive than the back, affecting tool use, safety, and medical assessment procedures.
+
+
+20. 
+
+
+Domest[ai]ication of plants and animals is the process by which humans select and breed species for desired traits to meet nutritional and practical needs. Human selection favored larger seeds[aj], reduced plant shattering, tamer animals, and traits that increased yield, adaptability, and ease of management. For example, cereal grains such as wheat and rice were domesticated in ancient river valleys, which led to settled communities and the rise of complex societies.
+
+
+Domestication of plants and animals is the process by which humans select and breed species for desired traits to meet nutritional and practical needs. Human selec{missing} favored lar{missing} seeds, redu{missing} plant shatte{missing} tamer anim{missing} and tra{missing} that incre{missing} yield, adaptab{missing} and ea{missing} of manage{missing}  For example, cereal grains such as wheat and rice were domesticated in ancient river valleys, which led to settled communities and the rise of complex societies.
+21. 
+
+
+Photograph[ak]y is the process of creating permanent images by recording light on a sensitive surface, using lenses or optical systems to form an image. Early mechanisms used chemical reactions and lenses to focus light, while modern systems use digital sensors and electronic storage devices. As a result, photography transformed scientific observation, journalism, and personal expression by enabling accurate documentation, visual analysis, and wide dissemination of images worldwide, and it supported cultural memory, education, and legal evidence through verifiable visual records.        
+
+
+Photography is the process of creating permanent images by recording light on a sensitive surface, using lenses or optical systems to form an image. Early mecha{missing} used chem{missing} reactions an{missing} lenses t{missing} focus lig{missing} while mod{missing} systems us{missing} digital sens{missing} and elect{missing} storage devi{missing}  As a result, photography transformed scientific observation, journalism, and personal expression by enabling accurate documentation, visual analysis, and wide dissemination of images worldwide, and it supported cultural memory, education, and legal evidence through verifiable visual records.
+
+
+Key takeaways:
+
+
+1. Stop using “for example.”  Just give an example.  Don’t signal it.
+2. Stop using big lists both in the intact sentences and the sentences with missing letters.
+3. You can split the missing letters across two sentences.  The first sentence will have most of the missing letters.  The second sentence can have missing letters only at the beginning.
+4. You can have two complete sentences at the end, after the missing letters.
+5. You don’t always need an obvious “xxx is yyy” opening.
+6. Vocab shouldn’t be so technical.
+[a]CUT - not TOEFL, sensitive
+[b]The ETS content often ends with an example, but doesn't specifically use "for example" so you should cut that out of your questions, and prompt the AI to avoid overdoing it.
+[c]Avoid including long lists.  I spotted one sentence that might be described as a list in the ETS content.
+
+
+Long lists is a hallmark of AI answers.  ChatGPT loves to produce lists when asked to write about academic content.
+[d]Maybe the aforementioned "long list" is what you mean by "long-winded."  Don't overuse them.
+[e]Same as above, long-winded "for example" sentences, is that all right? @mgoodine@gmail.com
+[f]Not sure what your question for me is... but note my earlier comment about "for example."  You should give an example... but should avoid those specific words.
+[g]Words like "bulges" and "inertial" and "centrifugal" are far too difficult. 
+
+
+Add something in the prompt is to write in layman's terms, so a newcomer would understand, while keeping the freshman-level university textbook level
+[h]Indeed.  Those words are very hard, especially when they become the incomplete words!
+
+
+The trickiest and most technical word I think I saw in the ETS samples was "cognitive."  And that was in the crappy PDF.
+[i]We might have to write something in the prompt so the second and third sentences do not use proper nouns.
+[j]I can see in your samples that you are trying to shove ALL of the missing letters into one giant (second) sentence.  But in the ETS materials they often get split between TWO sentences (the second and third).
+
+
+In this case sometimes both sentences are missing letters all the way through.
+
+
+In other cases the second sentence is totally "unintact," while the third sentence is missing letters only at the beginning. 
+
+
+Check out the one on CLIMATE (loom) to see what I mean.
+[k]CUT - too difficult and abstract
+[l]I'll skip over the ones you have marked thusly.
+[m]This is way too technical.
+[n]These long-winded final sentences keep coming up.
+[o]Yeah, obviously you noticed the same thing I did.  The problem is the use of a list.  Adjust the prompt to specifically avoid them.
+[p]"Hormone" is probably too hard and technical.  Probably.
+[q]Now you've got a list all the way through the sentence with missing letters.  That's going to make it really really really hard for the student since they don't have much to go on.  Try splitting this into two sentences.  Something like:
+
+
+
+
+"Chronic stress alters our mood and can even weaken our immune system. Because it can also impair our concentration, it can be challenging to develop proper coping behaviors."
+
+
+That's off the top of my head and might not have the best words in the best positions.  But you get what I mean.  Sharing the incomplete words over two sentences will make the passage flow better and eliminate the big ugly list.
+[r]This has the same problem as above - "for example" and then a giant list.  This is the biggest list so far.
+
+
+Look at the PALEONTOLOGY and FOSSILS samples from the ETS content (Loom videos).  They have two intact sentences at the end!  Splitting this up into two concise sentences would solve the problem.
+[s]We need more variety in sentence structure. The opening sentence of each of the examples from ETS is formulaic, but there is more variety in the rest of the passages.
+[t]I feel like "museum" and "photography" are a bit too basic.  Maybe.  I know one of the ETS question is about "rain" but they do tend to be a little more technical.
+[u]This example is better.
+[v]Can you grasp what I mean now?  This is another list.  They all have lists. 
+
+
+Compare it to, for example:
+
+
+" Paleontologists also use fossils to learn about ancient environmental conditions. Finding marine fossils in landlocked areas, for example, suggests that these regions were very likely underwater once upon a time."
+
+
+Or even:
+
+
+"Logical reasoning is not just important for lawyers and scientists. It is also essential in everyday situations, from choosing the best investment options to resolving interpersonal conflicts."
+
+
+No lists there.
+[w]I revised this one quickly to show you the approach I mean.
+[x]List, list, list.  I will stop mentioning this now, as I think you get my point.
+[y]I'll mention it again.  This is a long list.  The next sentence is a list as well.
+[z]See above.  Resist the urge to specifically use "for example."
+[aa]I chopped up this final sentence into two just to, again, show you what I am getting at here.
+[ab]Here you have lists on either since of the conjunction!
+
+
+I would say:
+
+
+"Community radio stations serve a vital function by broadcasting local news and weather reports to local audiences.  This can increase both civic engagement and public safety, especially in remote regions with limited communication infrastructure."
+
+
+Or something like that.
+[ac]Way too hard.
+[ad]Way way way way too hard to have a missing segment.
+[ae]See above.  Setting aside the fact that the vocabulary is way too hard, you could split the missing letters over two sentences.  Like:
+
+
+"Cells accumulate damage over time, and our body's systems are unable to keep up with damage to critical organs. In time, this leads to muscle loss and weakened bones......"
+
+
+Or something like that,
+[af]See what I mean?  Not EVERYTHING needs to be a definition.  Look at the ETS question about water, for example.
+[ag]"spinal cord" is a bit too much.  You can just say "spine and brain" obviously.
+[ah]I don't even know what this means.  Very technical.
+[ai]See above
+[aj]So I have split this into two sentences.  Most of the blanks could go in the first sentence, with just a few at the beginning of the second sentence.
+
+
+Once you realize that the second sentence can have just a few blanks and then be mostly complete you will have a lot more freedom in designing the content!
+[ak]Duplicate?
+"""
+
+feedback_pattern = re.compile(r'\[([a-z]+)\](.*?)(?=\n\[[a-z]\]|\Z)', re.DOTALL)
+key_takeaways_pattern = re.compile(r'Key takeaways:\n(.*?)(?=\n\[a\]|\Z)', re.DOTALL)
+
+feedback_notes = []
+
+# Extract Key Takeaways
+key_takeaways_match = key_takeaways_pattern.search(doc_content)
+if key_takeaways_match:
+    takeaways_text = key_takeaways_match.group(1).strip()
+    for line in takeaways_text.split('\n'):
+        if line.strip():
+            feedback_notes.append({"type": "Key Takeaway", "content": line.strip()})
+
+# Extract specific feedback comments
+for match in feedback_pattern.finditer(doc_content):
+    marker = match.group(1)
+    content = match.group(2).strip()
+    
+    # Try to find author if mentioned
+    author_match = re.search(r'@([\w.-]+@[\w.-]+)', content)
+    author = author_match.group(1) if author_match else "Michael Goodine" # Default to Michael Goodine as he is the primary commenter
+
+    feedback_notes.append({
+        "marker": f"[{marker}]",
+        "content": content,
+        "author": author
+    })
+
+# Print formatted feedback
+print("--- Extracted Feedback ---")
+for note in feedback_notes:
+    if note.get("type") == "Key Takeaway":
+        print(f"Key Takeaway: {note['content']}")
+    else:
+        print(f"Feedback {note['marker']} (by {note['author']}): {note['content']}")
