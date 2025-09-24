@@ -16,7 +16,6 @@ function loadConfig() {
       MAX_COMPLETION_TOKENS: 8000,
       PASSAGE_LENGTH: { MIN: 65, MAX: 75 },
       BLANKS_COUNT: 10,
-      API_KEY: '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', // Default key
       OPENAI_URL: 'https://api.openai.com/v1/chat/completions'
     };
   }
