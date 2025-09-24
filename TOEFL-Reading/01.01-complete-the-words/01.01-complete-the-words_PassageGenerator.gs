@@ -470,12 +470,20 @@ function applyBlankingLogic(passage) {
   const blanksInSecond = 7;
   const blanksInThird = 3;
 
-  for (let i = 0; i < secondSentenceWords.length && i < blanksInSecond; i++) {
-    secondSentenceWords[i] = createBlank(secondSentenceWords[i]);
+  let blanksPlaced = 0;
+  for (let i = 0; i < secondSentenceWords.length && blanksPlaced < blanksInSecond; i++) {
+    if (i % 2 === 0) { // Blank every second word (even indices)
+      secondSentenceWords[i] = createBlank(secondSentenceWords[i]);
+      blanksPlaced++;
+    }
   }
 
-  for (let i = 0; i < thirdSentenceWords.length && i < blanksInThird; i++) {
-    thirdSentenceWords[i] = createBlank(thirdSentenceWords[i]);
+  blanksPlaced = 0;
+  for (let i = 0; i < thirdSentenceWords.length && blanksPlaced < blanksInThird; i++) {
+    if (i % 2 === 0) { // Blank every second word (even indices)
+      thirdSentenceWords[i] = createBlank(thirdSentenceWords[i]);
+      blanksPlaced++;
+    }
   }
 
   return [
