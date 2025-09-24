@@ -16,6 +16,7 @@ function loadConfig() {
       MAX_COMPLETION_TOKENS: 8000,
       PASSAGE_LENGTH: { MIN: 65, MAX: 75 },
       BLANKS_COUNT: 10,
+      API_KEY: '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', // Default key
       OPENAI_URL: 'https://api.openai.com/v1/chat/completions'
     };
   }
@@ -103,8 +104,10 @@ function generateTOEFL2026Passage(topic, outputRow) {
     const generatedText = generatePassageWithAI(topic);
 
     if (generatedText) {
+      Logger.log("Generated Passage: " + generatedText);
       // Apply blanking and then validate the blank count
       const tempBlankedPassage = applyBlankingLogic(generatedText);
+      Logger.log("Result from applyBlankingLogic: " + tempBlankedPassage);
       const blankCount = countBlanks(tempBlankedPassage);
 
       if (blankCount === CONFIG.BLANKS_COUNT) {
@@ -332,6 +335,74 @@ function callGoogle(topic) {
   }
 }
 
+// Function to split a passage into sentences using AI
+function splitSentencesWithAI(passage) {
+  const payload = {
+    model: CONFIG.OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: "You are a sentence splitter. Your task is to split the provided text into sentences. Respond with a JSON array of strings, where each string is a sentence. For example, for the input \"Hello world. How are you?\", you should respond with [\"Hello world.\", \"How are you?\"]. Do not add any explanation."
+      },
+      {
+        role: "user",
+        content: passage
+      }
+    ],
+    temperature: 1,
+    max_completion_tokens: CONFIG.MAX_COMPLETION_TOKENS
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(CONFIG.OPENAI_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + CONFIG.API_KEY
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const responseText = response.getContentText();
+    const data = JSON.parse(responseText);
+
+    if (data.error) {
+      Logger.log("API Error in splitSentencesWithAI: " + data.error.message);
+      return null;
+    }
+
+    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+      const content = data.choices[0].message.content.trim();
+      try {
+        const sentences = JSON.parse(content);
+        if (Array.isArray(sentences) && sentences.every(s => typeof s === 'string')) {
+          return sentences;
+        }
+      } catch (e) {
+        // If direct parsing fails, try to extract from a markdown block
+        const jsonMatch = content.match(/\[.*\]/s);
+        if (jsonMatch) {
+          try {
+            const sentences = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(sentences) && sentences.every(s => typeof s === 'string')) {
+              return sentences;
+            }
+          } catch (e2) {
+            Logger.log("Could not parse sentences from API response after regex match: " + jsonMatch[0]);
+          }
+        }
+      }
+      Logger.log("Could not find a valid JSON array in API response: " + content);
+    } else {
+      Logger.log("Unexpected API response structure in splitSentencesWithAI: " + responseText);
+    }
+  } catch (error) {
+    Logger.log("Error calling OpenAI in splitSentencesWithAI: " + error.toString());
+  }
+  return null; // Return null if anything fails
+}
+
 // Build the detailed prompt for passage generation
 function buildPassagePrompt(topic) {
   // Assemble the prompt from the configuration sheet
@@ -367,7 +438,15 @@ function validatePassage(passage) {
 
 // Apply blanking logic to the generated passage
 function applyBlankingLogic(passage) {
-  const sentences = passage.match(/[^.!?]+[.!?]+/g) || [];
+  let sentences = splitSentencesWithAI(passage);
+  Logger.log("LLM Sentence Splitting Result: " + JSON.stringify(sentences));
+  
+  if (!sentences) {
+    Logger.log("Warning: Failed to split sentences using AI. Blanking may not be accurate. Falling back to regex.");
+    // Fallback to regex if AI fails
+    sentences = passage.match(/[^.!?]+[.!?]+/g) || [];
+  }
+
   if (sentences.length < 3) {
     Logger.log("Warning: Passage has fewer than 3 sentences, cannot apply blanking as specified.");
     return passage;
