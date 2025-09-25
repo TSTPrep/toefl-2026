@@ -172,27 +172,12 @@ function generateDailyLifeShortPassage(topic, outputRow) {
   Logger.log("Passage generation completed for row " + outputRow);
 }
 
-// Generate passage using the selected LLM
+// Generate passage using gpt-5-mini
 function generatePassageWithAI(topic, genre, question1_type, question2_type) {
   const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type);
-  const provider = CONFIG.MODEL_PROVIDER;
 
-  if (provider === "OpenAI") {
-    return callOpenAI(prompt);
-  } else if (provider === "Anthropic") {
-    return callAnthropic(prompt);
-  } else if (provider === "Google") {
-    return callGoogle(prompt);
-  } else {
-    Logger.log("Error: Invalid model provider specified in Config sheet.");
-    return null;
-  }
-}
-
-// Helper function to call the OpenAI API
-function callOpenAI(prompt) {
   const payload = {
-    model: CONFIG.OPENAI_MODEL,
+    model: CONFIG['MODEL'],
     messages: [
       {
         role: "system",
@@ -203,22 +188,25 @@ function callOpenAI(prompt) {
         content: prompt
       }
     ],
-    temperature: CONFIG.TEMPERATURE,
-    max_completion_tokens: CONFIG.MAX_COMPLETION_TOKENS
+    temperature: CONFIG['TEMPERATURE'],
+    max_completion_tokens: CONFIG['MAX_COMPLETION_TOKENS']
   };
 
   try {
-    const response = UrlFetchApp.fetch(CONFIG.OPENAI_URL, {
+    Logger.log("Complete API Payload: " + JSON.stringify(payload, null, 2));
+    const response = UrlFetchApp.fetch(CONFIG['OPENAI_URL'], {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + CONFIG.API_KEY
+        "Authorization": "Bearer " + CONFIG['API_KEY']
       },
       payload: JSON.stringify(payload),
-      muteHttpExceptions: true
+      muteHttpExceptions: true // Add this to get full error response
     });
 
     const responseText = response.getContentText();
+    Logger.log("Raw API Response: " + responseText);
+
     const data = JSON.parse(responseText);
 
     if (data.error) {
@@ -234,103 +222,7 @@ function callOpenAI(prompt) {
     }
 
   } catch (error) {
-    Logger.log("Error calling OpenAI: " + error.toString());
-    return null;
-  }
-}
-
-// Helper function to call the Anthropic API
-function callAnthropic(prompt) {
-  const payload = {
-    model: CONFIG.ANTHROPIC_MODEL,
-    messages: [
-      {
-        role: "user",
-        content: prompt
-      }
-    ],
-    temperature: CONFIG.TEMPERATURE,
-    max_tokens: CONFIG.MAX_COMPLETION_TOKENS
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(CONFIG.ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": CONFIG.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
-
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
-
-    if (data.content && data.content.length > 0 && data.content[0].text) {
-      return data.content[0].text.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error calling Anthropic: " + error.toString());
-    return null;
-  }
-}
-
-// Helper function to call the Google API
-function callGoogle(prompt) {
-  const payload = {
-    contents: [
-      {
-        parts: [
-          {
-            text: prompt
-          }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: CONFIG.TEMPERATURE,
-      maxOutputTokens: CONFIG.MAX_COMPLETION_TOKENS
-    }
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(`${CONFIG.GOOGLE_URL}${CONFIG.GOOGLE_MODEL}:generateContent?key=${CONFIG.GOOGLE_API_KEY}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
-
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
-
-    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content.parts[0].text) {
-      return data.candidates[0].content.parts[0].text.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error calling Google: " + error.toString());
+    Logger.log("Error generating passage: " + error.toString());
     return null;
   }
 }
