@@ -5,8 +5,8 @@
 function loadConfig() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   // Find the sheet by its GID - **NOTE: This will need to be updated to the new sheet's GID**
-  const configSheet = ss.getSheets().filter(sheet => sheet.getSheetName() == 'Config')[0]; 
-  
+  const configSheet = ss.getSheets().filter(sheet => sheet.getSheetName() == 'Config')[0];
+
   if (!configSheet) {
     Logger.log("Error: Configuration sheet named 'Config' not found. Please create a 'Config' sheet.");
     return {};
@@ -95,7 +95,7 @@ const CONFIG = applyDefaultsToConfig(loadConfig());
 function loadTopics() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   // Find the sheet by its GID - **NOTE: This will need to be updated to the new sheet's GID**
-  const topicsSheet = ss.getSheets().filter(sheet => sheet.getSheetName() == 'Topics')[0]; 
+  const topicsSheet = ss.getSheets().filter(sheet => sheet.getSheetName() == 'Topics')[0];
 
   if (!topicsSheet) {
     Logger.log("Error: Topics sheet named 'Topics' not found. Please create a 'Topics' sheet.");
@@ -110,7 +110,7 @@ function loadTopics() {
   for (let i = 1; i < data.length; i++) {
     const category = data[i][0] || currentCategory;
     const topic = data[i][1];
-    
+
     if (topic) {
       if (!topics[category]) {
         topics[category] = [];
@@ -135,7 +135,7 @@ function generateDailyLifeShortPassage(topic, outputRow) {
   Logger.log("Generating passage for topic: " + topic);
 
   const questionTypes = getQuestionTypes();
-  const genre = Math.random() < CONFIG['Genre Distribution Emails'] ? 'email' : 'announcement';
+  const genre = Math.random() < CONFIG['Genre Distribution Emails'] ? 'email with greeting and sign-off' : 'announcement/notice format';
 
   const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1]);
   if (!generatedContent) {
@@ -164,6 +164,7 @@ function generateDailyLifeShortPassage(topic, outputRow) {
     } else {
       sheet.getRange(outputRow, 8).setValue("[Missing Question 2]");
     }
+    sheet.getRange(outputRow, 13, 1, 4).setValues([[genre, topic, questionTypes[0], questionTypes[1]]]);
   } catch (e) {
     Logger.log("Error parsing AI response: " + e.toString());
     sheet.getRange(outputRow, 2).setValue("Error: Could not parse AI response.");
@@ -271,28 +272,28 @@ function getQuestionTypes() {
     (q1 === 'Negative Factual Info' && q2 === 'Negative Factual Info') ||
     (q1 === 'Gist Purpose' && q2 === 'Gist Purpose') ||
     (q1 === 'Gist Content' && q2 === 'Gist Content') ||
-    ( (q1 === 'Gist Purpose' || q1 === 'Gist Content') && (q2 === 'Gist Purpose' || q2 === 'Gist Content') )
+    ((q1 === 'Gist Purpose' || q1 === 'Gist Content') && (q2 === 'Gist Purpose' || q2 === 'Gist Content'))
   );
-  
+
   return [q1, q2];
 }
 
 function getRandomType(types) {
-    const rand = Math.random();
-    let cumulative = 0;
+  const rand = Math.random();
+  let cumulative = 0;
 
-    // Create a weighted list
-    const weightedList = types.map(t => ({ type: t.type, weight: CONFIG[t.a] || 0 }));
-    const totalWeight = weightedList.reduce((sum, item) => sum + item.weight, 0);
+  // Create a weighted list
+  const weightedList = types.map(t => ({ type: t.type, weight: CONFIG[t.a] || 0 }));
+  const totalWeight = weightedList.reduce((sum, item) => sum + item.weight, 0);
 
-    // Normalize weights and select type
-    for (const item of weightedList) {
-        cumulative += item.weight / totalWeight;
-        if (rand < cumulative) {
-            return item.type;
-        }
+  // Normalize weights and select type
+  for (const item of weightedList) {
+    cumulative += item.weight / totalWeight;
+    if (rand < cumulative) {
+      return item.type;
     }
-    return weightedList[weightedList.length - 1].type; // Fallback
+  }
+  return weightedList[weightedList.length - 1].type; // Fallback
 }
 
 
@@ -307,21 +308,21 @@ function countWords(text) {
 function startBatchProcess() {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const batchSize = sheet.getRange('B1').getValue() || 5;
-  
+
   // Clear any existing triggers to prevent duplicates
-  stopBatchProcess(); 
-  
+  stopBatchProcess();
+
   // Use PropertiesService to store the state
   const userProperties = PropertiesService.getUserProperties();
   userProperties.setProperty('batchIndex', '0');
   userProperties.setProperty('batchSize', batchSize.toString());
-  
+
   // Create a trigger to run the processing function every 1 minute
   ScriptApp.newTrigger('processBatchChunk')
-      .timeBased()
-      .everyMinutes(1)
-      .create();
-      
+    .timeBased()
+    .everyMinutes(1)
+    .create();
+
   SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 10 passages will be generated in the background every minute. You can close this sheet.');
 }
 
@@ -335,12 +336,12 @@ function processBatchChunk() {
   for (let i = 0; i < chunkSize && index < size; i++) {
     // Generate one passage
     generateSinglePassage();
-    
+
     // Update the index for the next run
     index++;
     userProperties.setProperty('batchIndex', index.toString());
   }
-  
+
   if (index >= size) {
     // Batch is complete, so stop the process
     stopBatchProcess();
@@ -357,7 +358,7 @@ function stopBatchProcess() {
       ScriptApp.deleteTrigger(triggers[i]);
     }
   }
-  
+
   // Clear the stored properties
   const userProperties = PropertiesService.getUserProperties();
   userProperties.deleteProperty('batchIndex');
