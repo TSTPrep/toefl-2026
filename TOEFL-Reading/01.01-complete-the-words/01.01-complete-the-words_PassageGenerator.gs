@@ -467,39 +467,46 @@ function applyBlankingLogic(passage) {
   let secondSentenceWords = secondSentence.trim().split(/\s+/);
   let thirdSentenceWords = thirdSentence.trim().split(/\s+/);
 
-  const blanksInSecond = 7;
-  const blanksInThird = 3;
-
+  const combinedWords = [...secondSentenceWords, ...thirdSentenceWords];
+  const totalBlanksNeeded = 10;
   let blanksPlaced = 0;
-  for (let i = 0; i < secondSentenceWords.length && blanksPlaced < blanksInSecond; i++) {
+
+  for (let i = 0; i < combinedWords.length && blanksPlaced < totalBlanksNeeded; i++) {
     if (i % 2 === 0) { // Blank every second word (even indices)
-      secondSentenceWords[i] = createBlank(secondSentenceWords[i]);
+      combinedWords[i] = createBlank(combinedWords[i]);
       blanksPlaced++;
     }
   }
 
-  blanksPlaced = 0;
-  for (let i = 0; i < thirdSentenceWords.length && blanksPlaced < blanksInThird; i++) {
-    if (i % 2 === 0) { // Blank every second word (even indices)
-      thirdSentenceWords[i] = createBlank(thirdSentenceWords[i]);
-      blanksPlaced++;
-    }
-  }
+  // Reconstruct the sentences from the combined list
+  const newSecondSentenceWords = combinedWords.slice(0, secondSentenceWords.length);
+  const newThirdSentenceWords = combinedWords.slice(secondSentenceWords.length);
 
   return [
     firstSentence.trim(),
-    secondSentenceWords.join(" "),
-    thirdSentenceWords.join(" "),
+    newSecondSentenceWords.join(" "),
+    newThirdSentenceWords.join(" "),
     remainingSentences.trim()
   ].join(" ").trim();
 }
 
-// Create a blank from a word (second half deleted)
+// Create a blank from a word (second half wrapped in braces)
 function createBlank(word) {
   if (word.length < 2) return word;
 
-  const midPoint = Math.ceil(word.length / 2);
-  return word.substring(0, midPoint) + "{missing}";
+  // Preserve trailing punctuation
+  const punctuationRegex = /[.,!?;:]$/;
+  const match = word.match(punctuationRegex);
+  const punctuation = match ? match[0] : '';
+  const wordStem = punctuation ? word.slice(0, -1) : word;
+
+  // After removing punctuation, the word stem might be too short to blank.
+  if (wordStem.length < 2) return word; 
+
+  const midPoint = Math.ceil(wordStem.length / 2);
+  const firstHalf = wordStem.substring(0, midPoint);
+  const secondHalf = wordStem.substring(midPoint);
+  return firstHalf + "{" + secondHalf + "}" + punctuation;
 }
 
 // Utility functions
@@ -508,7 +515,7 @@ function countWords(text) {
 }
 
 function countBlanks(text) {
-  return (text.match(/\{missing\}/g) || []).length;
+  return (text.match(/{.*?}/g) || []).length;
 }
 
 // Shows a UI alert if possible, otherwise logs the message.
