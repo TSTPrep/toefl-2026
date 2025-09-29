@@ -35,33 +35,38 @@ function applyDefaultsToConfig(config) {
     'OPENAI_URL': 'https://api.openai.com/v1/chat/completions',
     'Passage Word Count Min': 130,
     'Passage Word Count Max': 170,
-    'Genre Distribution Announcements': 0.3,
-    'Genre Distribution Emails': 0.7,
+    'Genre Distribution Announcements': 0.1,
+    'Genre Distribution Emails': 0.9,
     'Gist Purpose Question %': 0.55, // 50-60%
     'Gist Content Question %': 0, // Omitted
     'Factual Info Question %': 0.9, // 90% at least one, 40-50% two
     'Negative Factual Info Question %': 0.1, // 10% at most one
     'Inference Question %': 0.65, // 60-70%
     'TARGET_SHEET_GID': '', // Placeholder, user must provide the GID of the target sheet
-    'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a long passage and three multiple-choice questions based on a given topic and instructions.\n- The passage must be between 130 and 170 words.\n- The passage must be in the style of a "Daily Life" text, such as an email or announcement, with a formal-but-simple register appropriate for a CEFR B1-B2 level.\n- Use short, direct sentences and everyday vocabulary. Avoid idioms or culturally specific slang.\n- The passage must include a date or time, a specific requirement or condition (e.g., "bring ID," "RSVP by Friday"), and subtle clues that can be used for inference questions.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious “xxx is yyy” opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
-    'User Prompt Template': 'Generate a long {genre} about "{topic}". It must be between 130 and 170 words. Then, generate one "{question1_type}" question, one "{question2_type}" question, and one "{question3_type}" question. Each question must have one correct answer and three plausible distractors. Adhere to the JSON schema provided in the system prompt.',
+    'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a long passage and four multiple-choice questions based on a given topic and instructions.\n- The passage must be between 130 and 170 words.\n- The passage must be in the style of a "Daily Life" text, such as an email or announcement, with a formal-but-simple register appropriate for a CEFR B1-B2 level.\n- Use short, direct sentences and everyday vocabulary. Avoid idioms or culturally specific slang.\n- The passage must include a date or time, a specific requirement or condition (e.g., "bring ID," "RSVP by Friday"), and subtle clues that can be used for inference questions.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious “xxx is yyy” opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
+    'User Prompt Template': 'Generate a long {genre} about "{topic}". It must be between 130 and 170 words. Then, generate one "{question1_type}" question, one "{question2_type}" question, one "{question3_type}" question, and one "{question4_type}" question. Each question must have one correct answer and five plausible distractors. Adhere to the JSON schema provided in the system prompt.',
     'JSON Output Schema': `
 {
   "passage": "string",
   "question1": {
     "question": "string",
     "answer": "string",
-    "distractors": ["string", "string", "string"]
+    "distractors": ["string", "string", "string", "string", "string"]
   },
   "question2": {
     "question": "string",
     "answer": "string",
-    "distractors": ["string", "string", "string"]
+    "distractors": ["string", "string", "string", "string", "string"]
   },
   "question3": {
     "question": "string",
     "answer": "string",
-    "distractors": ["string", "string", "string"]
+    "distractors": ["string", "string", "string", "string", "string"]
+  },
+  "question4": {
+    "question": "string",
+    "answer": "string",
+    "distractors": ["string", "string", "string", "string", "string"]
   }
 }
 `
@@ -140,9 +145,10 @@ function generateDailyLifeLongPassage(topic, outputRow) {
   Logger.log("Generating passage for topic: " + topic);
 
   const questionTypes = getQuestionTypes();
-  const genre = Math.random() < CONFIG['Genre Distribution Emails'] ? 'email' : 'announcement';
+  const genre = Math.random() < CONFIG['Genre Distribution Emails'] ? 'email with subject line, greeting and sign-off in this format:\nSubject: <Subject Line>\n<e-mail body>'
+  : 'announcement/notice format';
 
-  const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2]);
+  const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2], questionTypes[3]);
   if (!generatedContent) {
     sheet.getRange(outputRow, 2).setValue("Error: Failed to generate content");
     return;
@@ -157,25 +163,33 @@ function generateDailyLifeLongPassage(topic, outputRow) {
     if (content.question1) {
       sheet.getRange(outputRow, 3).setValue(content.question1.question || "[Missing Question 1]");
       sheet.getRange(outputRow, 4).setValue(content.question1.answer || "[Missing Answer 1]");
-      sheet.getRange(outputRow, 5, 1, 3).setValues([content.question1.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+      sheet.getRange(outputRow, 5, 1, 5).setValues([content.question1.distractors || ["[Missing]", "[Missing]", "[Missing]", "[Missing]", "[Missing]"]]);
     } else {
       sheet.getRange(outputRow, 3).setValue("[Missing Question 1]");
     }
 
     if (content.question2) {
-      sheet.getRange(outputRow, 8).setValue(content.question2.question || "[Missing Question 2]");
-      sheet.getRange(outputRow, 9).setValue(content.question2.answer || "[Missing Answer 2]");
-      sheet.getRange(outputRow, 10, 1, 3).setValues([content.question2.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+      sheet.getRange(outputRow, 10).setValue(content.question2.question || "[Missing Question 2]");
+      sheet.getRange(outputRow, 11).setValue(content.question2.answer || "[Missing Answer 2]");
+      sheet.getRange(outputRow, 12, 1, 5).setValues([content.question2.distractors || ["[Missing]", "[Missing]", "[Missing]", "[Missing]", "[Missing]"]]);
     } else {
-      sheet.getRange(outputRow, 8).setValue("[Missing Question 2]");
+      sheet.getRange(outputRow, 10).setValue("[Missing Question 2]");
     }
 
     if (content.question3) {
-      sheet.getRange(outputRow, 13).setValue(content.question3.question || "[Missing Question 3]");
-      sheet.getRange(outputRow, 14).setValue(content.question3.answer || "[Missing Answer 3]");
-      sheet.getRange(outputRow, 15, 1, 3).setValues([content.question3.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+      sheet.getRange(outputRow, 17).setValue(content.question3.question || "[Missing Question 3]");
+      sheet.getRange(outputRow, 18).setValue(content.question3.answer || "[Missing Answer 3]");
+      sheet.getRange(outputRow, 19, 1, 5).setValues([content.question3.distractors || ["[Missing]", "[Missing]", "[Missing]", "[Missing]", "[Missing]"]]);
     } else {
-      sheet.getRange(outputRow, 13).setValue("[Missing Question 3]");
+      sheet.getRange(outputRow, 17).setValue("[Missing Question 3]");
+    }
+
+    if (content.question4) {
+      sheet.getRange(outputRow, 24).setValue(content.question4.question || "[Missing Question 4]");
+      sheet.getRange(outputRow, 25).setValue(content.question4.answer || "[Missing Answer 4]");
+      sheet.getRange(outputRow, 26, 1, 5).setValues([content.question4.distractors || ["[Missing]", "[Missing]", "[Missing]", "[Missing]", "[Missing]"]]);
+    } else {
+      sheet.getRange(outputRow, 24).setValue("[Missing Question 4]");
     }
 
   } catch (e) {
@@ -186,27 +200,12 @@ function generateDailyLifeLongPassage(topic, outputRow) {
   Logger.log("Passage generation completed for row " + outputRow);
 }
 
-// Generate passage using the selected LLM
-function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type) {
-  const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type);
-  const provider = CONFIG.MODEL_PROVIDER;
+// Generate passage using gpt-5-mini
+function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type, question4_type) {
+  const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type, question4_type);
 
-  if (provider === "OpenAI") {
-    return callOpenAI(prompt);
-  } else if (provider === "Anthropic") {
-    return callAnthropic(prompt);
-  } else if (provider === "Google") {
-    return callGoogle(prompt);
-  } else {
-    Logger.log("Error: Invalid model provider specified in Config sheet.");
-    return null;
-  }
-}
-
-// Helper function to call the OpenAI API
-function callOpenAI(prompt) {
   const payload = {
-    model: CONFIG.OPENAI_MODEL,
+    model: CONFIG['MODEL'],
     messages: [
       {
         role: "system",
@@ -217,22 +216,24 @@ function callOpenAI(prompt) {
         content: prompt
       }
     ],
-    temperature: CONFIG.TEMPERATURE,
-    max_completion_tokens: CONFIG.MAX_COMPLETION_TOKENS
+    temperature: CONFIG['TEMPERATURE'],
+    max_completion_tokens: CONFIG['MAX_COMPLETION_TOKENS']
   };
 
   try {
-    const response = UrlFetchApp.fetch(CONFIG.OPENAI_URL, {
+    const response = UrlFetchApp.fetch(CONFIG['OPENAI_URL'], {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + CONFIG.API_KEY
+        "Authorization": "Bearer " + CONFIG['API_KEY']
       },
       payload: JSON.stringify(payload),
-      muteHttpExceptions: true
+      muteHttpExceptions: true // Add this to get full error response
     });
 
     const responseText = response.getContentText();
+    Logger.log("Raw API Response: " + responseText);
+
     const data = JSON.parse(responseText);
 
     if (data.error) {
@@ -248,115 +249,20 @@ function callOpenAI(prompt) {
     }
 
   } catch (error) {
-    Logger.log("Error calling OpenAI: " + error.toString());
-    return null;
-  }
-}
-
-// Helper function to call the Anthropic API
-function callAnthropic(prompt) {
-  const payload = {
-    model: CONFIG.ANTHROPIC_MODEL,
-    messages: [
-      {
-        role: "user",
-        content: prompt
-      }
-    ],
-    temperature: CONFIG.TEMPERATURE,
-    max_tokens: CONFIG.MAX_COMPLETION_TOKENS
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(CONFIG.ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": CONFIG.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
-
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
-
-    if (data.content && data.content.length > 0 && data.content[0].text) {
-      return data.content[0].text.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error calling Anthropic: " + error.toString());
-    return null;
-  }
-}
-
-// Helper function to call the Google API
-function callGoogle(prompt) {
-  const payload = {
-    contents: [
-      {
-        parts: [
-          {
-            text: prompt
-          }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: CONFIG.TEMPERATURE,
-      maxOutputTokens: CONFIG.MAX_COMPLETION_TOKENS
-    }
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(`${CONFIG.GOOGLE_URL}${CONFIG.GOOGLE_MODEL}:generateContent?key=${CONFIG.GOOGLE_API_KEY}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
-
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
-
-    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content.parts[0].text) {
-      return data.candidates[0].content.parts[0].text.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error calling Google: " + error.toString());
+    Logger.log("Error generating passage: " + error.toString());
     return null;
   }
 }
 
 // Build the detailed prompt for passage generation
-function buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type) {
+function buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type, question4_type) {
   let prompt = CONFIG['User Prompt Template'] || ''; // Fallback to empty string
   prompt = prompt.replace(/{topic}/g, topic);
   prompt = prompt.replace(/{genre}/g, genre);
   prompt = prompt.replace(/{question1_type}/g, question1_type);
   prompt = prompt.replace(/{question2_type}/g, question2_type);
   prompt = prompt.replace(/{question3_type}/g, question3_type);
+  prompt = prompt.replace(/{question4_type}/g, question4_type);
   return prompt;
 }
 
@@ -364,12 +270,12 @@ function getQuestionTypes() {
   const sheet = getSheetByGid(CONFIG['TARGET_SHEET_GID']);
   if (!sheet) {
     Logger.log("Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found. Using default question types.");
-    return ['Factual Info', 'Factual Info', 'Factual Info'];
+    return ['Factual Info', 'Factual Info', 'Factual Info', 'Factual Info'];
   }
   const mode = sheet.getRange('D1').getValue();
 
   if (mode && mode !== "General Distribution") {
-    return [mode, mode, mode];
+    return [mode, mode, mode, mode];
   }
 
   // General Distribution Logic
@@ -380,7 +286,7 @@ function getQuestionTypes() {
     { type: 'Inference', weightConfigKey: 'Inference Question %' }
   ];
 
-  let q1, q2, q3;
+  let q1, q2, q3, q4;
 
   // Determine Question 1 (Gist Purpose has a higher chance of being first)
   const rand1 = Math.random();
@@ -414,7 +320,18 @@ function getQuestionTypes() {
 
   q3 = getRandomType(availableTypesForQ3);
   
-  return [q1, q2, q3];
+  // Determine Question 4
+  let availableTypesForQ4 = availableTypesForQ3.filter(t => t.type !== q3);
+  if (q1 === 'Negative Factual Info' || q2 === 'Negative Factual Info' || q3 === 'Negative Factual Info') {
+    availableTypesForQ4 = availableTypesForQ4.filter(t => t.type !== 'Negative Factual Info');
+  }
+  if (q1 === 'Gist Purpose' || q2 === 'Gist Purpose' || q3 === 'Gist Purpose') {
+    availableTypesForQ4 = availableTypesForQ4.filter(t => t.type !== 'Gist Purpose');
+  }
+
+  q4 = getRandomType(availableTypesForQ4);
+  
+  return [q1, q2, q3, q4];
 }
 
 function getRandomType(types) {
