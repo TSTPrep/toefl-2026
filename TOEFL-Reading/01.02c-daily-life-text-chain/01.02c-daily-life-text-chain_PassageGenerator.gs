@@ -132,28 +132,49 @@ const TOPICS = loadTopics();
 
 // Main function to generate a passage and questions
 function generateDailyLifeTextChainPassage(topic, outputRow) {
+  const executionId = Utilities.getUuid();
+  Logger.log("[" + executionId + "] START: Generating passage for topic: '" + topic + "' at row " + outputRow);
+  
   const sheet = getSheetByGid(CONFIG['TARGET_SHEET_GID']);
   if (!sheet) {
-    Logger.log("Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found.");
+    Logger.log("[" + executionId + "] Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found.");
     return;
   }
-  Logger.log("Generating passage for topic: " + topic);
 
   const questionTypes = getQuestionTypes();
   // Genre is not directly used for text chain, but kept for consistency if needed elsewhere
   const genre = 'text chain'; 
 
+  const apiStartTime = new Date();
+  Logger.log("[" + executionId + "] Calling AI API at " + apiStartTime.toISOString());
+  
   const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2]);
-  Logger.log("AI-generated content for topic '" + topic + "': " + generatedContent);
+  
+  const apiEndTime = new Date();
+  const apiDuration = (apiEndTime - apiStartTime) / 1000;
+  Logger.log("[" + executionId + "] API call completed in " + apiDuration + " seconds");
+  Logger.log("[" + executionId + "] AI-generated content for topic '" + topic + "': " + (generatedContent ? generatedContent.substring(0, 100) + "..." : "NULL"));
+  
   if (!generatedContent) {
-    Logger.log("Error: Failed to generate content from AI for topic: " + topic + ". The AI returned a null or empty response.");
+    Logger.log("[" + executionId + "] ERROR: Failed to generate content from AI for topic: " + topic + ". The AI returned a null or empty response.");
+    
+    // Check if the row already has content - if so, don't overwrite it!
+    const existingPassage = sheet.getRange(outputRow, 2).getValue();
+    if (existingPassage && existingPassage.length > 0 && !existingPassage.startsWith("Error:") && !existingPassage.startsWith("[Missing")) {
+      Logger.log("[" + executionId + "] WARNING: Row " + outputRow + " already has content. Skipping error write to prevent overwriting good data.");
+      return;
+    }
+    
     sheet.getRange(outputRow, 2).setValue("Error: Failed to generate content");
     return;
   }
 
   // Assuming the AI returns content in a structured format, e.g., JSON string
   try {
+    Logger.log("[" + executionId + "] Parsing JSON response...");
     const content = JSON.parse(generatedContent);
+    
+    Logger.log("[" + executionId + "] Writing to row " + outputRow + "...");
     sheet.getRange(outputRow, 1).setValue(topic);
     sheet.getRange(outputRow, 2).setValue(content.passage || "[Missing Passage]");
 
@@ -182,16 +203,64 @@ function generateDailyLifeTextChainPassage(topic, outputRow) {
     }
 
   } catch (e) {
-    Logger.log("Error parsing AI response: " + e.toString());
-    Logger.log("Content that failed to parse: " + generatedContent);
+    Logger.log("[" + executionId + "] ERROR parsing AI response: " + e.toString());
+    Logger.log("[" + executionId + "] Content that failed to parse: " + generatedContent);
+    
+    // Check if the row already has content before overwriting
+    const existingPassage = sheet.getRange(outputRow, 2).getValue();
+    if (existingPassage && existingPassage.length > 0 && !existingPassage.startsWith("Error:") && !existingPassage.startsWith("[Missing")) {
+      Logger.log("[" + executionId + "] WARNING: Row " + outputRow + " already has content. Skipping error write to prevent overwriting good data.");
+      return;
+    }
+    
     sheet.getRange(outputRow, 2).setValue("Error: Could not parse AI response.");
   }
 
-  Logger.log("Passage generation completed for row " + outputRow);
+  const totalEndTime = new Date();
+  Logger.log("[" + executionId + "] COMPLETE: Passage generation completed for row " + outputRow);
 }
 
-// Generate passage using gpt-5-mini
+// Generate passage using gpt-5-mini with retry logic
 function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type) {
+  const maxRetries = 2;
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    if (attempt > 1) {
+      Logger.log("Retry attempt " + attempt + " of " + maxRetries + " after waiting 3 seconds...");
+      Utilities.sleep(3000); // Wait 3 seconds before retry
+    }
+    
+    try {
+      const result = attemptAPICall(topic, genre, question1_type, question2_type, question3_type);
+      if (result) {
+        if (attempt > 1) {
+          Logger.log("SUCCESS on retry attempt " + attempt);
+        }
+        return result;
+      }
+      lastError = "API returned null or empty response";
+    } catch (error) {
+      lastError = error.toString();
+      Logger.log("Attempt " + attempt + " failed: " + lastError);
+      
+      // If it's a timeout or address unavailable error, retry
+      if (lastError.includes("Address unavailable") || lastError.includes("timeout")) {
+        continue;
+      } else {
+        // For other errors, don't retry
+        Logger.log("Non-retryable error encountered. Stopping retry attempts.");
+        break;
+      }
+    }
+  }
+  
+  Logger.log("All retry attempts failed. Last error: " + lastError);
+  return null;
+}
+
+// Helper function to make a single API call attempt
+function attemptAPICall(topic, genre, question1_type, question2_type, question3_type) {
   const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type);
 
   const payload = {
@@ -212,36 +281,30 @@ function generatePassageWithAI(topic, genre, question1_type, question2_type, que
 
   Logger.log("Payload sent to OpenAI API: " + JSON.stringify(payload));
 
-  try {
-    const response = UrlFetchApp.fetch(CONFIG['OPENAI_URL'], {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + CONFIG['API_KEY']
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true // Add this to get full error response
-    });
+  const response = UrlFetchApp.fetch(CONFIG['OPENAI_URL'], {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + CONFIG['API_KEY']
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true // Add this to get full error response
+  });
 
-    const responseText = response.getContentText();
-    Logger.log("Raw API Response: " + responseText);
+  const responseText = response.getContentText();
+  Logger.log("Raw API Response: " + responseText);
 
-    const data = JSON.parse(responseText);
+  const data = JSON.parse(responseText);
 
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
+  if (data.error) {
+    Logger.log("API Error: " + data.error.message);
+    return null;
+  }
 
-    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      return data.choices[0].message.content.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error generating passage: " + error.toString());
+  if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+    return data.choices[0].message.content.trim();
+  } else {
+    Logger.log("Unexpected API response structure: " + responseText);
     return null;
   }
 }
@@ -359,24 +422,54 @@ function startBatchProcess() {
       .everyMinutes(1)
       .create();
       
-  SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 10 passages will be generated in the background every minute. You can close this sheet.');
+  SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 3 passages will be generated in the background every minute. You can close this sheet.');
 }
 
-// Processes a chunk of up to 10 items from the batch. This function is run by the trigger.
+// Processes a chunk of up to 3 items from the batch. This function is run by the trigger.
 function processBatchChunk() {
+  const chunkStartTime = new Date();
+  Logger.log("=== BATCH CHUNK STARTING at " + chunkStartTime.toISOString() + " ===");
+  
   const userProperties = PropertiesService.getUserProperties();
   let index = parseInt(userProperties.getProperty('batchIndex'), 10);
   const size = parseInt(userProperties.getProperty('batchSize'), 10);
-  const chunkSize = 10; // Process up to 10 passages per run
+  const chunkSize = 3; // Process up to 3 passages per run (reduced from 10 to avoid timeouts)
+  const maxExecutionTime = 5 * 60 * 1000; // 5 minutes in milliseconds (leave 1 min buffer)
+
+  Logger.log("Batch status: " + index + " of " + size + " completed. Processing up to " + chunkSize + " more.");
 
   for (let i = 0; i < chunkSize && index < size; i++) {
+    // Check if we're approaching the execution time limit
+    const elapsedTime = new Date() - chunkStartTime;
+    if (elapsedTime > maxExecutionTime) {
+      Logger.log("WARNING: Approaching execution time limit (" + (elapsedTime / 1000) + " seconds). Stopping this chunk early.");
+      break;
+    }
+    
+    Logger.log("--- Processing item " + (index + 1) + " of " + size + " (elapsed: " + (elapsedTime / 1000) + "s) ---");
+    
     // Generate one passage
-    generateSinglePassage();
+    try {
+      generateSinglePassage();
+      
+      // Add a small delay between API calls to avoid rate limiting
+      if (i < chunkSize - 1 && index < size - 1) {
+        Logger.log("Waiting 2 seconds before next generation to avoid rate limiting...");
+        Utilities.sleep(2000); // 2 second delay
+      }
+    } catch (error) {
+      Logger.log("ERROR in batch processing item " + (index + 1) + ": " + error.toString());
+      // Continue to next item even if this one failed
+    }
     
     // Update the index for the next run
     index++;
     userProperties.setProperty('batchIndex', index.toString());
   }
+  
+  const chunkEndTime = new Date();
+  const chunkDuration = (chunkEndTime - chunkStartTime) / 1000;
+  Logger.log("=== BATCH CHUNK COMPLETED in " + chunkDuration + " seconds ===");
   
   if (index >= size) {
     // Batch is complete, so stop the process
@@ -411,7 +504,12 @@ function generateSinglePassage() {
   }
   const startRow = sheet.getRange('C1').getValue() || 5;
   const nextEmptyRow = Math.max(startRow, sheet.getLastRow() + 1);
+  
+  Logger.log("generateSinglePassage: Calculated nextEmptyRow = " + nextEmptyRow + " (startRow: " + startRow + ", lastRow: " + sheet.getLastRow() + ")");
+  
   const topic = getTopicFromSheet();
+  Logger.log("generateSinglePassage: Selected topic = '" + topic + "'");
+  
   generateDailyLifeTextChainPassage(topic, nextEmptyRow);
 }
 
