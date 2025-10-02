@@ -30,7 +30,7 @@ function applyDefaultsToConfig(config) {
   const defaults = {
     'MODEL': 'gpt-5-mini',
     'TEMPERATURE': 1,
-    'MAX_COMPLETION_TOKENS': 8000,
+    'MAX_COMPLETION_TOKENS': 16000,
     'API_KEY': '', // Placeholder, user must provide
     'OPENAI_URL': 'https://api.openai.com/v1/chat/completions',
     'Passage Word Count Min': 120,
@@ -409,7 +409,16 @@ function startBatchProcess() {
   const batchSize = sheet.getRange('B1').getValue() || 5;
   
   // Clear any existing triggers to prevent duplicates
-  stopBatchProcess(); 
+  Logger.log('Cleaning up any existing triggers before starting...');
+  const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'processBatchChunk') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
+    }
+  }
+  Logger.log('Deleted ' + deletedCount + ' existing trigger(s)');
   
   // Use PropertiesService to store the state
   const userProperties = PropertiesService.getUserProperties();
@@ -421,60 +430,78 @@ function startBatchProcess() {
       .timeBased()
       .everyMinutes(1)
       .create();
-      
-  SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 3 passages will be generated in the background every minute. You can close this sheet.');
+  
+  Logger.log('Created new trigger for batch processing');    
+  SpreadsheetApp.getUi().alert('Batch process started!\n\n' + 
+    (deletedCount > 0 ? 'Cleaned up ' + deletedCount + ' old trigger(s).\n' : '') +
+    'Generating ' + batchSize + ' passages total.\n' +
+    'Processing up to 3 passages per minute.\n\n' +
+    'You can close this sheet and the process will continue in the background.');
 }
 
 // Processes a chunk of up to 3 items from the batch. This function is run by the trigger.
 function processBatchChunk() {
-  const chunkStartTime = new Date();
-  Logger.log("=== BATCH CHUNK STARTING at " + chunkStartTime.toISOString() + " ===");
+  const lock = LockService.getScriptLock();
   
-  const userProperties = PropertiesService.getUserProperties();
-  let index = parseInt(userProperties.getProperty('batchIndex'), 10);
-  const size = parseInt(userProperties.getProperty('batchSize'), 10);
-  const chunkSize = 3; // Process up to 3 passages per run (reduced from 10 to avoid timeouts)
-  const maxExecutionTime = 5 * 60 * 1000; // 5 minutes in milliseconds (leave 1 min buffer)
-
-  Logger.log("Batch status: " + index + " of " + size + " completed. Processing up to " + chunkSize + " more.");
-
-  for (let i = 0; i < chunkSize && index < size; i++) {
-    // Check if we're approaching the execution time limit
-    const elapsedTime = new Date() - chunkStartTime;
-    if (elapsedTime > maxExecutionTime) {
-      Logger.log("WARNING: Approaching execution time limit (" + (elapsedTime / 1000) + " seconds). Stopping this chunk early.");
-      break;
-    }
-    
-    Logger.log("--- Processing item " + (index + 1) + " of " + size + " (elapsed: " + (elapsedTime / 1000) + "s) ---");
-    
-    // Generate one passage
-    try {
-      generateSinglePassage();
-      
-      // Add a small delay between API calls to avoid rate limiting
-      if (i < chunkSize - 1 && index < size - 1) {
-        Logger.log("Waiting 2 seconds before next generation to avoid rate limiting...");
-        Utilities.sleep(2000); // 2 second delay
-      }
-    } catch (error) {
-      Logger.log("ERROR in batch processing item " + (index + 1) + ": " + error.toString());
-      // Continue to next item even if this one failed
-    }
-    
-    // Update the index for the next run
-    index++;
-    userProperties.setProperty('batchIndex', index.toString());
+  // Try to acquire lock - if another instance is running, skip this execution
+  if (!lock.tryLock(1000)) { // Wait up to 1 second for lock
+    Logger.log("SKIPPED: Another batch chunk is already running. Exiting to prevent parallel execution.");
+    return;
   }
   
-  const chunkEndTime = new Date();
-  const chunkDuration = (chunkEndTime - chunkStartTime) / 1000;
-  Logger.log("=== BATCH CHUNK COMPLETED in " + chunkDuration + " seconds ===");
-  
-  if (index >= size) {
-    // Batch is complete, so stop the process
-    stopBatchProcess();
-    Logger.log('Batch process completed and trigger has been removed.');
+  try {
+    const chunkStartTime = new Date();
+    Logger.log("=== BATCH CHUNK STARTING at " + chunkStartTime.toISOString() + " ===");
+    
+    const userProperties = PropertiesService.getUserProperties();
+    let index = parseInt(userProperties.getProperty('batchIndex'), 10);
+    const size = parseInt(userProperties.getProperty('batchSize'), 10);
+    const chunkSize = 3; // Process up to 3 passages per run (reduced from 10 to avoid timeouts)
+    const maxExecutionTime = 4 * 60 * 1000; // 4 minutes in milliseconds (leave 2 min buffer)
+
+    Logger.log("Batch status: " + index + " of " + size + " completed. Processing up to " + chunkSize + " more.");
+
+    for (let i = 0; i < chunkSize && index < size; i++) {
+      // Check if we're approaching the execution time limit
+      const elapsedTime = new Date() - chunkStartTime;
+      if (elapsedTime > maxExecutionTime) {
+        Logger.log("WARNING: Approaching execution time limit (" + (elapsedTime / 1000) + " seconds). Stopping this chunk early.");
+        break;
+      }
+      
+      Logger.log("--- Processing item " + (index + 1) + " of " + size + " (elapsed: " + (elapsedTime / 1000) + "s) ---");
+      
+      // Generate one passage
+      try {
+        generateSinglePassage();
+        
+        // Add a small delay between API calls to avoid rate limiting
+        if (i < chunkSize - 1 && index < size - 1) {
+          Logger.log("Waiting 2 seconds before next generation to avoid rate limiting...");
+          Utilities.sleep(2000); // 2 second delay
+        }
+      } catch (error) {
+        Logger.log("ERROR in batch processing item " + (index + 1) + ": " + error.toString());
+        // Continue to next item even if this one failed
+      }
+      
+      // Update the index for the next run
+      index++;
+      userProperties.setProperty('batchIndex', index.toString());
+    }
+    
+    const chunkEndTime = new Date();
+    const chunkDuration = (chunkEndTime - chunkStartTime) / 1000;
+    Logger.log("=== BATCH CHUNK COMPLETED in " + chunkDuration + " seconds ===");
+    
+    if (index >= size) {
+      // Batch is complete, so stop the process
+      stopBatchProcess();
+      Logger.log('Batch process completed and trigger has been removed.');
+    }
+  } finally {
+    // Always release the lock
+    lock.releaseLock();
   }
 }
 
@@ -482,16 +509,52 @@ function processBatchChunk() {
 function stopBatchProcess() {
   // Delete all triggers for this script
   const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
   for (let i = 0; i < triggers.length; i++) {
     if (triggers[i].getHandlerFunction() === 'processBatchChunk') {
       ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
     }
   }
+  
+  Logger.log('Deleted ' + deletedCount + ' processBatchChunk trigger(s)');
   
   // Clear the stored properties
   const userProperties = PropertiesService.getUserProperties();
   userProperties.deleteProperty('batchIndex');
   userProperties.deleteProperty('batchSize');
+  
+  if (deletedCount > 0) {
+    SpreadsheetApp.getUi().alert('Batch process stopped. Deleted ' + deletedCount + ' trigger(s).');
+  } else {
+    SpreadsheetApp.getUi().alert('No batch triggers found to delete.');
+  }
+}
+
+// EMERGENCY: Force stop ALL triggers and reset everything
+function forceStopAllTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
+  
+  Logger.log('Force stopping all triggers...');
+  
+  for (let i = 0; i < triggers.length; i++) {
+    try {
+      Logger.log('Deleting trigger: ' + triggers[i].getHandlerFunction());
+      ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
+    } catch (e) {
+      Logger.log('Error deleting trigger: ' + e.toString());
+    }
+  }
+  
+  // Clear all stored properties
+  const userProperties = PropertiesService.getUserProperties();
+  userProperties.deleteProperty('batchIndex');
+  userProperties.deleteProperty('batchSize');
+  
+  Logger.log('Force stopped ' + deletedCount + ' trigger(s)');
+  SpreadsheetApp.getUi().alert('FORCE STOP COMPLETE: Deleted ALL ' + deletedCount + ' trigger(s) and cleared properties.');
 }
 
 
@@ -546,6 +609,8 @@ function onOpen() {
     .addSeparator()
     .addItem('Start Batch Process', 'startBatchProcess')
     .addItem('Stop Batch Process', 'stopBatchProcess')
+    .addSeparator()
+    .addItem('⚠️ FORCE STOP ALL TRIGGERS', 'forceStopAllTriggers')
     .addToUi();
 }
 
