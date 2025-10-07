@@ -43,8 +43,8 @@ function applyDefaultsToConfig(config) {
     'Negative Factual Info Question %': 0.1, // 10% at most one
     'Inference Question %': 0.9, // 90% at least one, 25% two
     'TARGET_SHEET_GID': '', // Placeholder, user must provide the GID of the target sheet
-    'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a text chain passage and three multiple-choice questions based on a given topic and instructions.\n- The passage must be between 120 and 200 words long (including names repeated).\n- The passage must be structured like a chat log or group text.\n- Each entry must begin with name + timestamp (e.g., "Larissa Velez (10:00 A.M.)").\n- Use short, conversational messages rather than paragraphs.\n- Ensure clarity of Roles: Make sure each participant has a distinct responsibility or contribution.\n- Add embedded Clues for Inference: Add brief callbacks (“We know what happened last time”) or clarifications.\n- Maintain Consistency with Real-Life Chats: Keep timestamps close together, use short sentences, but avoid slang.\n- Use multiple speakers (usually 3–5 participants).\n- Ensure order matters: later messages build on earlier ones.\n- Maintain an informal but professional tone (colleagues, classmates, project teams).\n- Emphasize task coordination (who does what, by when, and why) and team collaboration around a shared deadline or project.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious “xxx is yyy” opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
-    'User Prompt Template': 'Generate a text chain about "{topic}". It must be between 120 and 200 words. Then, generate one "{question1_type}" question, one "{question2_type}" question, and one "{question3_type}" question. Each question must have one correct answer and three plausible distractors. Adhere to the JSON schema provided in the system prompt.',
+    'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a text chain passage and five multiple-choice questions based on a given topic and instructions.\n- The passage must be between 120 and 200 words long (including names repeated).\n- The passage must be structured like a chat log or group text.\n- Each entry must begin with name + timestamp (e.g., "Larissa Velez (10:00 A.M.)").\n- Use short, conversational messages rather than paragraphs.\n- Ensure clarity of Roles: Make sure each participant has a distinct responsibility or contribution.\n- Add embedded Clues for Inference: Add brief callbacks ("We know what happened last time") or clarifications.\n- Maintain Consistency with Real-Life Chats: Keep timestamps close together, use short sentences, but avoid slang.\n- Use multiple speakers (usually 3–5 participants).\n- Ensure order matters: later messages build on earlier ones.\n- Maintain an informal but professional tone (colleagues, classmates, project teams).\n- Emphasize task coordination (who does what, by when, and why) and team collaboration around a shared deadline or project.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious "xxx is yyy" opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
+    'User Prompt Template': 'Generate a text chain about "{topic}". It must be between 120 and 200 words. Then, generate five questions with one correct answer and three plausible distractors each. Adhere to the JSON schema provided in the system prompt.',
     'JSON Output Schema': `
 {
   "passage": "string",
@@ -59,6 +59,16 @@ function applyDefaultsToConfig(config) {
     "distractors": ["string", "string", "string"]
   },
   "question3": {
+    "question": "string",
+    "answer": "string",
+    "distractors": ["string", "string", "string"]
+  },
+  "question4": {
+    "question": "string",
+    "answer": "string",
+    "distractors": ["string", "string", "string"]
+  },
+  "question5": {
     "question": "string",
     "answer": "string",
     "distractors": ["string", "string", "string"]
@@ -148,7 +158,7 @@ function generateDailyLifeTextChainPassage(topic, outputRow) {
   const apiStartTime = new Date();
   Logger.log("[" + executionId + "] Calling AI API at " + apiStartTime.toISOString());
   
-  const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2]);
+  const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2], questionTypes[3], questionTypes[4]);
   
   const apiEndTime = new Date();
   const apiDuration = (apiEndTime - apiStartTime) / 1000;
@@ -202,6 +212,22 @@ function generateDailyLifeTextChainPassage(topic, outputRow) {
       sheet.getRange(outputRow, 13).setValue("[Missing Question 3]");
     }
 
+    if (content.question4) {
+      sheet.getRange(outputRow, 18).setValue(content.question4.question || "[Missing Question 4]");
+      sheet.getRange(outputRow, 19).setValue(content.question4.answer || "[Missing Answer 4]");
+      sheet.getRange(outputRow, 20, 1, 3).setValues([content.question4.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+    } else {
+      sheet.getRange(outputRow, 18).setValue("[Missing Question 4]");
+    }
+
+    if (content.question5) {
+      sheet.getRange(outputRow, 23).setValue(content.question5.question || "[Missing Question 5]");
+      sheet.getRange(outputRow, 24).setValue(content.question5.answer || "[Missing Answer 5]");
+      sheet.getRange(outputRow, 25, 1, 3).setValues([content.question5.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+    } else {
+      sheet.getRange(outputRow, 23).setValue("[Missing Question 5]");
+    }
+
   } catch (e) {
     Logger.log("[" + executionId + "] ERROR parsing AI response: " + e.toString());
     Logger.log("[" + executionId + "] Content that failed to parse: " + generatedContent);
@@ -221,7 +247,7 @@ function generateDailyLifeTextChainPassage(topic, outputRow) {
 }
 
 // Generate passage using gpt-5-mini with retry logic
-function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type) {
+function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type) {
   const maxRetries = 2;
   let lastError = null;
   
@@ -232,7 +258,7 @@ function generatePassageWithAI(topic, genre, question1_type, question2_type, que
     }
     
     try {
-      const result = attemptAPICall(topic, genre, question1_type, question2_type, question3_type);
+      const result = attemptAPICall(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type);
       if (result) {
         if (attempt > 1) {
           Logger.log("SUCCESS on retry attempt " + attempt);
@@ -260,8 +286,8 @@ function generatePassageWithAI(topic, genre, question1_type, question2_type, que
 }
 
 // Helper function to make a single API call attempt
-function attemptAPICall(topic, genre, question1_type, question2_type, question3_type) {
-  const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type);
+function attemptAPICall(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type) {
+  const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type);
 
   const payload = {
     model: CONFIG['MODEL'],
@@ -310,13 +336,10 @@ function attemptAPICall(topic, genre, question1_type, question2_type, question3_
 }
 
 // Build the detailed prompt for passage generation
-function buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type) {
+function buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type) {
   let prompt = CONFIG['User Prompt Template'] || ''; // Fallback to empty string
+  // Only substitute {topic} as question types are now fixed in the prompt template
   prompt = prompt.replace(/{topic}/g, topic);
-  prompt = prompt.replace(/{genre}/g, genre);
-  prompt = prompt.replace(/{question1_type}/g, question1_type);
-  prompt = prompt.replace(/{question2_type}/g, question2_type);
-  prompt = prompt.replace(/{question3_type}/g, question3_type);
   return prompt;
 }
 
@@ -324,12 +347,12 @@ function getQuestionTypes() {
   const sheet = getSheetByGid(CONFIG['TARGET_SHEET_GID']);
   if (!sheet) {
     Logger.log("Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found. Using default question types.");
-    return ['Factual Info', 'Factual Info', 'Factual Info'];
+    return ['Factual Info', 'Factual Info', 'Factual Info', 'Inference', 'Inference'];
   }
   const mode = sheet.getRange('D1').getValue();
 
   if (mode && mode !== "General Distribution") {
-    return [mode, mode, mode];
+    return [mode, mode, mode, mode, mode];
   }
 
   // General Distribution Logic
@@ -340,41 +363,96 @@ function getQuestionTypes() {
     { type: 'Inference', weightConfigKey: 'Inference Question %' }
   ];
 
-  let q1, q2, q3;
+  let q1, q2, q3, q4, q5;
+  let usedNegativeFactual = false;
+  let usedGistPurpose = false;
 
   // Determine Question 1 (Gist Purpose has a higher chance of being first)
   const rand1 = Math.random();
   if (rand1 < CONFIG['Gist Purpose Question %']) {
     q1 = 'Gist Purpose';
+    usedGistPurpose = true;
   } else {
     q1 = getRandomType(questionTypes.filter(t => t.type !== 'Gist Purpose')); // Select from others
   }
+  
+  if (q1 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
 
-  // Determine Question 2 and 3, respecting constraints
+  // Determine Question 2
   let availableTypesForQ2 = questionTypes.filter(t => t.type !== 'Gist Content'); // Gist Content is omitted
   
   // Ensure Negative Factual Info appears at most once
-  if (q1 === 'Negative Factual Info') {
+  if (usedNegativeFactual) {
     availableTypesForQ2 = availableTypesForQ2.filter(t => t.type !== 'Negative Factual Info');
+  }
+  
+  // Ensure Gist Purpose appears at most once
+  if (usedGistPurpose) {
+    availableTypesForQ2 = availableTypesForQ2.filter(t => t.type !== 'Gist Purpose');
   }
 
   q2 = getRandomType(availableTypesForQ2);
+  
+  if (q2 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
+  if (q2 === 'Gist Purpose') {
+    usedGistPurpose = true;
+  }
 
-  let availableTypesForQ3 = availableTypesForQ2.filter(t => t.type !== q2); // Remove Q2 type from consideration for Q3
-
-  // If Q1 or Q2 is Negative Factual Info, remove it from Q3 options
-  if (q1 === 'Negative Factual Info' || q2 === 'Negative Factual Info') {
+  // Determine Question 3
+  let availableTypesForQ3 = questionTypes.filter(t => t.type !== 'Gist Content');
+  
+  if (usedNegativeFactual) {
     availableTypesForQ3 = availableTypesForQ3.filter(t => t.type !== 'Negative Factual Info');
   }
-  
-  // If Q1 or Q2 is Gist Purpose, remove it from Q3 options
-  if (q1 === 'Gist Purpose' || q2 === 'Gist Purpose') {
+  if (usedGistPurpose) {
     availableTypesForQ3 = availableTypesForQ3.filter(t => t.type !== 'Gist Purpose');
   }
 
   q3 = getRandomType(availableTypesForQ3);
   
-  return [q1, q2, q3];
+  if (q3 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
+  if (q3 === 'Gist Purpose') {
+    usedGistPurpose = true;
+  }
+
+  // Determine Question 4
+  let availableTypesForQ4 = questionTypes.filter(t => t.type !== 'Gist Content');
+  
+  if (usedNegativeFactual) {
+    availableTypesForQ4 = availableTypesForQ4.filter(t => t.type !== 'Negative Factual Info');
+  }
+  if (usedGistPurpose) {
+    availableTypesForQ4 = availableTypesForQ4.filter(t => t.type !== 'Gist Purpose');
+  }
+
+  q4 = getRandomType(availableTypesForQ4);
+  
+  if (q4 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
+  if (q4 === 'Gist Purpose') {
+    usedGistPurpose = true;
+  }
+
+  // Determine Question 5
+  let availableTypesForQ5 = questionTypes.filter(t => t.type !== 'Gist Content');
+  
+  if (usedNegativeFactual) {
+    availableTypesForQ5 = availableTypesForQ5.filter(t => t.type !== 'Negative Factual Info');
+  }
+  if (usedGistPurpose) {
+    availableTypesForQ5 = availableTypesForQ5.filter(t => t.type !== 'Gist Purpose');
+  }
+
+  q5 = getRandomType(availableTypesForQ5);
+  
+  return [q1, q2, q3, q4, q5];
 }
 
 function getRandomType(types) {
