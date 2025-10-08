@@ -44,6 +44,7 @@ function applyDefaultsToConfig(config) {
     'Organization Question %': 0.2, // 20%
     'Author\'s Purpose Question %': 0.9, // 90% frequency, 5-10% two
     'Insert Text Question %': 0.15, // 15%
+    'Click on the Sentence %': 0.15, // 15%
     'TARGET_SHEET_GID': '', // Placeholder, user must provide the GID of the target sheet
     'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate an academic passage and five multiple-choice questions based on a given topic and instructions.\n- Background knowledge is not required to understand the passage.\n- The passage must be between 165 and 210 words long, structured into 2-4 paragraphs.\n- Each passage must have a clear structure: introduction → explanation → examples → broader implications or conclusion.\n- The passage must be written in a neutral, academic tone — similar to a university-level textbook or lecture, but simplified for ESL learners.\n- Sentences are moderately complex but not overly dense; technical terms are introduced with short explanations.\n- Avoid personal opinions; instead, present facts, research findings, or historical accounts.\n- The opening paragraph should introduce the topic in a straightforward way.\n- Middle paragraphs should provide evidence, examples, case studies, or contrasting perspectives.\n- The final paragraph should often widen the lens — talking about significance, implications, or ongoing research.\n- When creating passages, imagine writing a short, engaging, entry-level textbook section on a topic a curious college freshman might encounter for the first time. It should be fact-based, accessible, structured, and balanced with both examples and implications.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious “xxx is yyy” opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
     'User Prompt Template': 'Generate an academic passage about "{topic}". It must be between 165 and 210 words and structured into 2-4 paragraphs. Then, generate one "{question1_type}" question, one "{question2_type}" question, one "{question3_type}" question, one "{question4_type}" question, and one "{question5_type}" question. Each question must have one correct answer and three plausible distractors. Adhere to the JSON schema provided in the system prompt.',
@@ -303,7 +304,8 @@ function getQuestionTypes() {
     { type: 'Organization', weightConfigKey: 'Organization Question %', orderConstraint: 'any', minCount: 0, maxCount: 1 },
     { type: 'Insert Text', weightConfigKey: 'Insert Text Question %', orderConstraint: 'last', minCount: 0, maxCount: 1 },
     { type: 'Inference', weightConfigKey: 'Inference Question %', orderConstraint: 'middle', minCount: 1, maxCount: 2 },
-    { type: 'Gist Content', weightConfigKey: 'Gist Content Question %', orderConstraint: 'first', minCount: 0, maxCount: 1, firstQuestionChance: 1.0 } // Gist Content is almost always first if present
+    { type: 'Gist Content', weightConfigKey: 'Gist Content Question %', orderConstraint: 'first', minCount: 0, maxCount: 1, firstQuestionChance: 1.0 }, // Gist Content is almost always first if present
+    { type: 'Click on the Sentence', weightConfigKey: 'Click on the Sentence %', orderConstraint: 'any', minCount: 0, maxCount: 1 }
   ];
 
   let selectedTypes = [];
@@ -348,6 +350,10 @@ function getQuestionTypes() {
     }
     if (nextType === 'Vocabulary' && selectedTypes.includes('Vocabulary')) {
       availableTypes = availableTypes.filter(t => t.type !== 'Vocabulary');
+      continue;
+    }
+    if (nextType === 'Click on the Sentence' && selectedTypes.includes('Click on the Sentence')) {
+      availableTypes = availableTypes.filter(t => t.type !== 'Click on the Sentence');
       continue;
     }
 
