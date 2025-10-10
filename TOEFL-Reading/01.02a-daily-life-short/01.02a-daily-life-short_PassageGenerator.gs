@@ -347,25 +347,46 @@ function startBatchProcess() {
 
 // Processes a chunk of up to 10 items from the batch. This function is run by the trigger.
 function processBatchChunk() {
-  const userProperties = PropertiesService.getUserProperties();
-  let index = parseInt(userProperties.getProperty('batchIndex'), 10);
-  const size = parseInt(userProperties.getProperty('batchSize'), 10);
-  const chunkSize = 10; // Process up to 10 passages per run
+  const lock = LockService.getUserLock();
+  // Try to acquire the lock to prevent concurrent executions. Wait up to 1 second.
+  if (!lock.tryLock(1000)) {
+    Logger.log('Could not acquire lock, another process is likely running.');
+    return;
+  }
 
-  for (let i = 0; i < chunkSize && index < size; i++) {
-    // Generate one passage
-    generateSinglePassage();
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    const indexStr = userProperties.getProperty('batchIndex');
+    
+    // If the batchIndex property is missing, it means the process was stopped or completed.
+    if (!indexStr) {
+      Logger.log('Batch process was stopped or completed. Removing trigger.');
+      stopBatchProcess(); // Clean up the trigger just in case
+      return;
+    }
 
-    // Update the index for the next run
-    index++;
-    userProperties.setProperty('batchIndex', index.toString());
-  }
+    let index = parseInt(indexStr, 10);
+    const size = parseInt(userProperties.getProperty('batchSize'), 10);
+    const chunkSize = 10; // Process up to 10 passages per run
 
-  if (index >= size) {
-    // Batch is complete, so stop the process
-    stopBatchProcess();
-    Logger.log('Batch process completed and trigger has been removed.');
-  }
+    for (let i = 0; i < chunkSize && index < size; i++) {
+      // Generate one passage
+      generateSinglePassage();
+
+      // Update the index for the next run
+      index++;
+      userProperties.setProperty('batchIndex', index.toString());
+    }
+
+    if (index >= size) {
+      // Batch is complete, so stop the process
+      stopBatchProcess();
+      Logger.log('Batch process completed and trigger has been removed.');
+    }
+  } finally {
+    // Always release the lock to allow the next execution to run.
+    lock.releaseLock();
+  }
 }
 
 // Stops the batch process by deleting the trigger and clearing properties.
