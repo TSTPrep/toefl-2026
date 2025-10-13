@@ -42,8 +42,8 @@ function applyDefaultsToConfig(config) {
     'OPENAI_URL': 'https://api.openai.com/v1/chat/completions',
     'Passage Word Count Min': 130,
     'Passage Word Count Max': 170,
-    'Genre Distribution Announcements': 0.1,
-    'Genre Distribution Emails': 0.9,
+    'Genre Distribution Announcements': 0.3,
+    'Genre Distribution Emails': 0.7,
     'Gist Purpose Question %': 0.55, // 50-60%
     'Gist Content Question %': 0, // Omitted
     'Factual Info Question %': 0.9, // 90% at least one, 40-50% two
@@ -156,7 +156,7 @@ function generateDailyLifeLongPassage(topic, outputRow) {
   Logger.log("Generating passage for topic: " + topic);
 
   const genre = Math.random() < CONFIG['Genre Distribution Emails'] ? 'email with subject line, greeting and sign-off in this format:\\nSubject: <Subject Line>\\n<e-mail body>'
-  : 'announcement/notice format';
+  : 'announcement/notice format. Do not begin with the word “notice”. Do not make any headings or any intro that ends with colon. Start right with the notice passage consisting of complete sentences.';
 
   const generatedContent = generatePassageWithAI(topic, genre);
   if (!generatedContent) {
@@ -295,6 +295,22 @@ function countWords(text) {
   return text.trim().split(/\s+/).length;
 }
 
+// --- Lock-based row reservation to avoid overwrites ---
+function reserveNextRow_(sheet) {
+  const lock = LockService.getDocumentLock();
+  lock.waitLock(30000); // wait up to 30s for concurrent writers
+  try {
+    const startRow = sheet.getRange('C1').getValue() || 5;
+    const lastRow = sheet.getLastRow();
+    const nextEmptyRow = Math.max(startRow, lastRow + 1);
+    // Reserve the row so concurrent calls see a higher lastRow immediately
+    sheet.getRange(nextEmptyRow, 1).setValue('⏳ Generating...');
+    return nextEmptyRow;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // --- Trigger-Based Batch Processing ---
 
 // Starts the batch generation process by setting up a time-driven trigger.
@@ -358,7 +374,6 @@ function stopBatchProcess() {
   userProperties.deleteProperty('batchSize');
 }
 
-
 // Wrapper function for single random passage generation from menu
 function generateSinglePassage() {
   const sheet = getSheetByGid(CONFIG['TARGET_SHEET_GID']);
@@ -366,8 +381,10 @@ function generateSinglePassage() {
     SpreadsheetApp.getUi().alert("Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found. Please check your configuration.");
     return;
   }
-  const startRow = sheet.getRange('C1').getValue() || 5;
-  const nextEmptyRow = Math.max(startRow, sheet.getLastRow() + 1);
+
+  // Reserve a unique row under a lock so concurrent runs don't overwrite each other
+  const nextEmptyRow = reserveNextRow_(sheet);
+
   const topic = getTopicFromSheet();
   generateDailyLifeLongPassage(topic, nextEmptyRow);
 }
