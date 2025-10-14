@@ -150,7 +150,7 @@ function generateDailyLifeShortPassage(topic, outputRow) {
   Logger.log("Generating passage for topic: " + topic);
 
   const genre = Math.random() < CONFIG['Genre Distribution Emails'] ? 'email with subject line, greeting and sign-off in this format:\nSubject: <Subject Line>\n<Greeting> ...'
-  : 'announcement/notice format';
+  : 'announcement/notice format. Do not begin with the word “notice”. Do not make any heading. Start right with the notice passage consisting of complete sentences.';
 
   const generatedContent = generatePassageWithAI(topic, genre, outputRow);
   if (!generatedContent) {
@@ -452,6 +452,9 @@ function onOpen() {
     .addSeparator()
     .addItem('Start Batch Process', 'startBatchProcess')
     .addItem('Stop Batch Process', 'stopBatchProcess')
+    .addSeparator()
+    .addItem('Start Edit Sheet Conversions', 'startEditSheetConversions')
+    .addItem('Delete Editing Sheets', 'deleteEditingSheets') // New menu item
     .addToUi();
 }
 
@@ -466,3 +469,153 @@ function getSheetByGid(gid) {
   }
   return null; // Return null if no sheet with the given GID is found
 }
+
+
+/**
+ * Duplicates the 'Template' sheet, populates it with data, and creates a hyperlink
+ * back to the new sheet in the 'Generated Passages' sheet.
+ * If a sheet for a specific row already exists, it is deleted and recreated.
+ */
+function startEditSheetConversions() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const generateSheet = ss.getSheetByName("Generated Passages");
+  const templateSheet = ss.getSheetByName("Template");
+
+  if (!generateSheet) {
+    SpreadsheetApp.getUi().alert('Error: "Generated Passages" sheet not found.');
+    return;
+  }
+  if (!templateSheet) {
+    SpreadsheetApp.getUi().alert('Error: "Template" sheet not found.');
+    return;
+  }
+
+  const startRow = generateSheet.getRange('C1').getValue();
+  const numRows = generateSheet.getRange('B1').getValue();
+
+  if (!startRow || !numRows || typeof startRow !== 'number' || typeof numRows !== 'number' || startRow <= 1 || numRows <= 0) {
+    SpreadsheetApp.getUi().alert('Please enter a valid start row (greater than 1) in C1 and a valid number of rows in B1.');
+    return;
+  }
+
+  const spreadsheetUrl = ss.getUrl();
+
+  for (let i = 0; i < numRows; i++) {
+    const currentRow = startRow + i;
+    const newSheetName = "Row " + currentRow;
+
+    const existingSheet = ss.getSheetByName(newSheetName);
+    if (existingSheet) {
+      ss.deleteSheet(existingSheet);
+      Logger.log(`Deleted existing sheet: "${newSheetName}"`);
+    }
+
+    const newSheet = templateSheet.copyTo(ss);
+    newSheet.setName(newSheetName);
+    ss.setActiveSheet(newSheet);
+
+    const sourceData = generateSheet.getRange(currentRow, 1, 1, 32).getValues()[0];
+    const topicText = sourceData[0];
+
+    // --- NEW FEATURE: Create Hyperlink ---
+    const sheetUrl = '#gid=' + newSheet.getSheetId();
+    const linkCell = generateSheet.getRange(currentRow, 1);
+    const richTextLink = SpreadsheetApp.newRichTextValue()
+      .setText(topicText)
+      .setLinkUrl(sheetUrl)
+      .build();
+    linkCell.setRichTextValue(richTextLink);
+    // --- END NEW FEATURE ---
+
+
+    // --- Populate the new sheet ---
+    // Note: We use topicText here instead of sourceData[0] for clarity.
+    newSheet.getRange('B3').setValue(topicText);       // Column A -> B3 (Topic)
+    newSheet.getRange('B6').setValue(sourceData[1]);   // Column B -> B6 (Passage)
+    newSheet.getRange('B9').setValue(sourceData[2]);   // Column C -> B9 (Q1 Question)
+    newSheet.getRange('B12').setValue(sourceData[3]);  // Column D -> B12 (Q1 Answer)
+    newSheet.getRange('B15:B17').setValues(sourceData.slice(4, 7).map(x => [x])); // E,F,G -> B15:B17
+
+    // --- Question 2 ---
+    newSheet.getRange('B20').setValue(sourceData[7]);  // Column H -> B20 (Q2 Question)
+    newSheet.getRange('B23').setValue(sourceData[8]);  // Column I -> B23 (Q2 Answer)
+    newSheet.getRange('B26:B28').setValues(sourceData.slice(9, 12).map(x => [x])); // J,K,L -> B26:B28
+
+    // --- Question 3 ---
+    newSheet.getRange('B31').setValue(sourceData[12]); // Column M -> B31 (Q3 Question)
+    newSheet.getRange('B34').setValue(sourceData[13]); // Column N -> B34 (Q3 Answer)
+    newSheet.getRange('B37:B39').setValues(sourceData.slice(14, 17).map(x => [x])); // O,P,Q -> B37:B39
+
+    // --- Question 4 ---
+    newSheet.getRange('B42').setValue(sourceData[17]); // Column R -> B42 (Q4 Question)
+    newSheet.getRange('B45').setValue(sourceData[18]); // Column S -> B45 (Q4 Answer)
+    newSheet.getRange('B48:B50').setValues(sourceData.slice(19, 22).map(x => [x])); // T,U,V -> B48:B50
+
+    // --- Question 5 ---
+    newSheet.getRange('B53').setValue(sourceData[22]); // Column W -> B53 (Q5 Question)
+    newSheet.getRange('B56').setValue(sourceData[23]); // Column X -> B56 (Q5 Answer)
+    newSheet.getRange('B59:B61').setValues(sourceData.slice(24, 27).map(x => [x])); // Y,Z,AA -> B59:B61
+
+    // --- Question 6 ---
+    newSheet.getRange('B64').setValue(sourceData[27]); // Column AB -> B64 (Q6 Question)
+    newSheet.getRange('B67').setValue(sourceData[28]); // Column AC -> B67 (Q6 Answer)
+    newSheet.getRange('B70:B72').setValues(sourceData.slice(29, 32).map(x => [x])); // AD,AE,AF -> B70:B72
+
+
+    Logger.log(`Successfully created and populated sheet: "${newSheetName}" and added link.`);
+  }
+  SpreadsheetApp.getUi().alert('Sheet conversion process completed!');
+}
+
+/**
+ * Deletes a range of sheets and removes the corresponding hyperlinks and text formatting
+ * in column A of the 'Generated Passages' sheet. The process is based on the start row
+ * and number of rows specified in cells C1 and B1.
+ */
+function deleteEditingSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const generateSheet = ss.getSheetByName("Generated Passages");
+
+  if (!generateSheet) {
+    SpreadsheetApp.getUi().alert('Error: "Generated Passages" sheet not found.');
+    return;
+  }
+
+  // Read the start row from C1 and the amount of rows from B1.
+  const startRow = generateSheet.getRange('C1').getValue();
+  const numRows = generateSheet.getRange('B1').getValue();
+
+  if (!startRow || !numRows || typeof startRow !== 'number' || typeof numRows !== 'number' || startRow <= 1 || numRows <= 0) {
+    SpreadsheetApp.getUi().alert('Please enter a valid start row (greater than 1) in C1 and a valid number of rows in B1.');
+    return;
+  }
+
+  let deletedCount = 0;
+  // Loop through the specified rows to identify sheets and links for deletion.
+  for (let i = 0; i < numRows; i++) {
+    const currentRow = startRow + i;
+    const sheetName = "Row " + currentRow;
+    const sheetToDelete = ss.getSheetByName(sheetName);
+
+    // --- FIX: Remove Hyperlink and Clear Formatting ---
+    const linkCell = generateSheet.getRange(currentRow, 1);
+    const topicText = linkCell.getValue(); // Get the plain text
+
+    // Set the value back to plain text and then clear all formatting.
+    // This removes the blue color and underline.
+    linkCell.setValue(topicText).clearFormat();
+    // --- END FIX ---
+
+    // If the sheet exists, delete it.
+    if (sheetToDelete) {
+      ss.deleteSheet(sheetToDelete);
+      Logger.log(`Deleted sheet: "${sheetName}" and reset its link cell.`);
+      deletedCount++;
+    } else {
+      Logger.log(`Sheet "${sheetName}" not found. Skipping link cell reset.`);
+    }
+  }
+
+  SpreadsheetApp.getUi().alert(`Deletion process completed. ${deletedCount} sheets were removed and their links were cleared.`);
+}
+
