@@ -50,7 +50,7 @@ function applyDefaultsToConfig(config) {
     'Negative Factual Info Question %': 0.1, // 10% at most one
     'Inference Question %': 0.65, // 60-70%
     'TARGET_SHEET_GID': '', // Placeholder, user must provide the GID of the target sheet
-    'Main Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a long passage and five multiple-choice questions based on a given topic and instructions.\\n- The passage must be between 130 and 170 words.\\n- The passage must be in the style of a "Daily Life" text, such as an email or announcement, with a formal-but-simple register appropriate for a CEFR B1-B2 level.\\n- Use short, direct sentences and everyday vocabulary. Avoid idioms or culturally specific slang.\\n- The passage must include a date or time, a specific requirement or condition (e.g., "bring ID," "RSVP by Friday"), and subtle clues that can be used for inference questions.\\n- The questions should test comprehension of the passage.\\n- Avoid using "for example" explicitly; just give examples.\\n- Avoid big lists in both intact sentences and sentences with missing letters.\\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\\n- Ensure there are two complete sentences at the end after any missing letter sections.\\n- Do not always use an obvious “xxx is yyy” opening.\\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\\n- The second and third sentences should ideally not use proper nouns.\\n- Avoid long-winded final sentences.\\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\\n- Introduce more variety in sentence structure beyond the opening sentence.\\n\\nGenerate a long {genre} about "{topic}". It must be between 130 and 170 words. Then, generate five multiple-choice questions. Each question must have one correct answer and three plausible distractors.\\n\\nYou must output your response in a JSON format that adheres to the provided schema.',
+    'Main Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a long passage and five multiple-choice questions based on a given topic and instructions.\\n- The passage must be between 130 and 170 words.\\n- The passage must be in the style of a "Daily Life" text, such as an email or announcement, with a formal-but-simple register appropriate for a CEFR B1-B2 level.\\n- Use short, direct sentences and everyday vocabulary. Avoid idioms or culturally specific slang.\\n- The passage must include a date or time, a specific requirement or condition (e.g., "bring ID," "RSVP by Friday"), and subtle clues that can be used for inference questions.\\n- The questions should test comprehension of the passage.\\n- Avoid using "for example" explicitly; just give examples.\\n- Avoid big lists in both intact sentences and sentences with missing letters.\\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\\n- Ensure there are two complete sentences at the end after any missing letter sections.\\n- Do not always use an obvious “xxx is yyy” opening.\\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\\n- The second and third sentences should ideally not use proper nouns.\\n- Avoid long-winded final sentences.\\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\\n- Introduce more variety in sentence structure beyond the opening sentence.\\n\\nGenerate a long {genre} about "{topic}". It must be between 130 and 170 words. Then, generate six multiple-choice questions. Each question must have one correct answer and three plausible distractors.\\n\\nYou must output your response in a JSON format that adheres to the provided schema.',
     'JSON Output Schema': `
 {
   "passage": "string",
@@ -75,6 +75,11 @@ function applyDefaultsToConfig(config) {
     "distractors": ["string", "string", "string"]
   },
   "question5": {
+    "question": "string",
+    "answer": "string",
+    "distractors": ["string", "string", "string"]
+  },
+  "question6": {
     "question": "string",
     "answer": "string",
     "distractors": ["string", "string", "string"]
@@ -210,6 +215,16 @@ function generateDailyLifeLongPassage(topic, outputRow) {
       sheet.getRange(outputRow, 23).setValue("[Missing Question 5]");
     }
 
+    // --- NEW: Add Question 6 ---
+    if (content.question6) {
+      sheet.getRange(outputRow, 28).setValue(content.question6.question || "[Missing Question 6]");
+      sheet.getRange(outputRow, 29).setValue(content.question6.answer || "[Missing Answer 6]");
+      sheet.getRange(outputRow, 30, 1, 3).setValues([content.question6.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+    } else {
+      sheet.getRange(outputRow, 28).setValue("[Missing Question 6]");
+    }
+    // --- END NEW ---
+
   } catch (e) {
     Logger.log("Error parsing AI response: " + e.toString());
     sheet.getRange(outputRow, 2).setValue("Error: Could not parse AI response.");
@@ -335,28 +350,67 @@ function startBatchProcess() {
   SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 10 passages will be generated in the background every minute. You can close this sheet.');
 }
 
-// Processes a chunk of up to 10 items from the batch. This function is run by the trigger.
+/**
+ * Processes a chunk of passages. This function is run by a time-based trigger.
+ * It uses a lock to prevent concurrent executions, ensuring that only one API call
+ * happens at a time and that the batch count is accurate.
+ */
 function processBatchChunk() {
-  const userProperties = PropertiesService.getUserProperties();
-  let index = parseInt(userProperties.getProperty('batchIndex'), 10);
-  const size = parseInt(userProperties.getProperty('batchSize'), 10);
-  const chunkSize = 10; // Process up to 10 passages per run
+  const lock = LockService.getScriptLock();
+  // Try to acquire the lock for 10 seconds. If it fails, another process is running.
+  const lockAcquired = lock.tryLock(10000);
 
-  for (let i = 0; i < chunkSize && index < size; i++) {
-    // Generate one passage
-    generateSinglePassage();
-    
-    // Update the index for the next run
-    index++;
-    userProperties.setProperty('batchIndex', index.toString());
+  if (!lockAcquired) {
+    Logger.log('Could not acquire lock. Another batch process is likely running. Skipping this execution.');
+    return;
   }
-  
-  if (index >= size) {
-    // Batch is complete, so stop the process
-    stopBatchProcess();
-    Logger.log('Batch process completed and trigger has been removed.');
+
+  try {
+    const userProperties = PropertiesService.getUserProperties();
+    const batchIndexStr = userProperties.getProperty('batchIndex');
+    const batchSizeStr = userProperties.getProperty('batchSize');
+
+    // If properties are missing, the job was likely stopped or completed.
+    if (!batchIndexStr || !batchSizeStr) {
+      Logger.log('Batch properties not found. Stopping any stray triggers.');
+      stopBatchProcess();
+      return;
+    }
+
+    let index = parseInt(batchIndexStr, 10);
+    const size = parseInt(batchSizeStr, 10);
+    const chunkSize = 10; // Process up to 10 passages per run to stay within execution limits
+
+    // If the job is already done, clean up and stop.
+    if (index >= size) {
+      Logger.log('Batch is already complete. Stopping process.');
+      stopBatchProcess();
+      return;
+    }
+
+    // Process one chunk of the batch
+    for (let i = 0; i < chunkSize && index < size; i++) {
+      generateSinglePassage();
+      
+      // Increment the index and save state after each successful generation
+      index++;
+      userProperties.setProperty('batchIndex', index.toString());
+    }
+    
+    // After the loop, check if the entire batch is complete.
+    if (index >= size) {
+      stopBatchProcess();
+      Logger.log('Batch process completed and trigger has been removed.');
+    }
+  } catch (e) {
+    // Log any errors to help with debugging
+    Logger.log('Error during batch processing chunk: ' + e.toString());
+  } finally {
+    // ALWAYS release the lock to allow the next execution to run.
+    lock.releaseLock();
   }
 }
+
 
 // Stops the batch process by deleting the trigger and clearing properties.
 function stopBatchProcess() {
@@ -483,7 +537,8 @@ function startEditSheetConversions() {
     newSheet.setName(newSheetName);
     ss.setActiveSheet(newSheet);
 
-    const sourceData = generateSheet.getRange(currentRow, 1, 1, 27).getValues()[0];
+    // --- UPDATED: Read 32 columns to include question 6 ---
+    const sourceData = generateSheet.getRange(currentRow, 1, 1, 32).getValues()[0];
     const topicText = sourceData[0];
 
     // --- NEW FEATURE: Create Hyperlink ---
@@ -524,6 +579,13 @@ function startEditSheetConversions() {
     newSheet.getRange('B53').setValue(sourceData[22]); // Column W -> B53 (Q5 Question)
     newSheet.getRange('B56').setValue(sourceData[23]); // Column X -> B56 (Q5 Answer)
     newSheet.getRange('B59:B61').setValues(sourceData.slice(24, 27).map(x => [x])); // Y,Z,AA -> B59:B61
+    
+    // --- NEW: Add Question 6 ---
+    // Assuming the template has space for Q6 starting around B64
+    newSheet.getRange('B64').setValue(sourceData[27]); // Column AB -> B64 (Q6 Question)
+    newSheet.getRange('B67').setValue(sourceData[28]); // Column AC -> B67 (Q6 Answer)
+    newSheet.getRange('B70:B72').setValues(sourceData.slice(29, 32).map(x => [x])); // AD,AE,AF -> B70:B72
+    // --- END NEW ---
 
     Logger.log(`Successfully created and populated sheet: "${newSheetName}" and added link.`);
   }
