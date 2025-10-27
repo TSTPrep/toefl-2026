@@ -30,7 +30,7 @@ function applyDefaultsToConfig(config) {
   const defaults = {
     'MODEL': 'gpt-5-mini',
     'TEMPERATURE': 1,
-    'MAX_COMPLETION_TOKENS': 8000,
+    'MAX_COMPLETION_TOKENS': 16000,
     'API_KEY': '', // Placeholder, user must provide
     'OPENAI_URL': 'https://api.openai.com/v1/chat/completions',
     'Passage Word Count Min': 120,
@@ -43,8 +43,8 @@ function applyDefaultsToConfig(config) {
     'Negative Factual Info Question %': 0.1, // 10% at most one
     'Inference Question %': 0.9, // 90% at least one, 25% two
     'TARGET_SHEET_GID': '', // Placeholder, user must provide the GID of the target sheet
-    'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a text chain passage and three multiple-choice questions based on a given topic and instructions.\n- The passage must be between 120 and 200 words long (including names repeated).\n- The passage must be structured like a chat log or group text.\n- Each entry must begin with name + timestamp (e.g., "Larissa Velez (10:00 A.M.)").\n- Use short, conversational messages rather than paragraphs.\n- Ensure clarity of Roles: Make sure each participant has a distinct responsibility or contribution.\n- Add embedded Clues for Inference: Add brief callbacks (“We know what happened last time”) or clarifications.\n- Maintain Consistency with Real-Life Chats: Keep timestamps close together, use short sentences, but avoid slang.\n- Use multiple speakers (usually 3–5 participants).\n- Ensure order matters: later messages build on earlier ones.\n- Maintain an informal but professional tone (colleagues, classmates, project teams).\n- Emphasize task coordination (who does what, by when, and why) and team collaboration around a shared deadline or project.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious “xxx is yyy” opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
-    'User Prompt Template': 'Generate a text chain about "{topic}". It must be between 120 and 200 words. Then, generate one "{question1_type}" question, one "{question2_type}" question, and one "{question3_type}" question. Each question must have one correct answer and three plausible distractors. Adhere to the JSON schema provided in the system prompt.',
+    'System Prompt': 'You are an expert in creating educational content for TOEFL Reading questions. Your task is to generate a text chain passage and five multiple-choice questions based on a given topic and instructions.\n- The passage must be between 120 and 200 words long (including names repeated).\n- The passage must be structured like a chat log or group text.\n- Each entry must begin with name + timestamp (e.g., "Larissa Velez (10:00 A.M.)").\n- Use short, conversational messages rather than paragraphs.\n- Ensure clarity of Roles: Make sure each participant has a distinct responsibility or contribution.\n- Add embedded Clues for Inference: Add brief callbacks ("We know what happened last time") or clarifications.\n- Maintain Consistency with Real-Life Chats: Keep timestamps close together, use short sentences, but avoid slang.\n- Use multiple speakers (usually 3–5 participants).\n- Ensure order matters: later messages build on earlier ones.\n- Maintain an informal but professional tone (colleagues, classmates, project teams).\n- Emphasize task coordination (who does what, by when, and why) and team collaboration around a shared deadline or project.\n- The questions should test comprehension of the passage.\n- Avoid using "for example" explicitly; just give examples.\n- Avoid big lists in both intact sentences and sentences with missing letters.\n- If applicable, split missing letters across two sentences. The first sentence can have most, and the second can have missing letters only at the beginning.\n- Ensure there are two complete sentences at the end after any missing letter sections.\n- Do not always use an obvious "xxx is yyy" opening.\n- Avoid overly technical vocabulary. Aim for freshman-level university textbook language that a newcomer would understand. The trickiest word in ETS samples was "cognitive."\n- The second and third sentences should ideally not use proper nouns.\n- Avoid long-winded final sentences.\n- Ensure sentences with missing letters do not contain lists, as this makes it too difficult for students.\n- Introduce more variety in sentence structure beyond the opening sentence.\n- You must output your response in a JSON format that adheres to the provided schema.',
+    'User Prompt Template': 'Generate a text chain about "{topic}". It must be between 120 and 200 words. Then, generate five questions with one correct answer and three plausible distractors each. Adhere to the JSON schema provided in the system prompt.',
     'JSON Output Schema': `
 {
   "passage": "string",
@@ -59,6 +59,16 @@ function applyDefaultsToConfig(config) {
     "distractors": ["string", "string", "string"]
   },
   "question3": {
+    "question": "string",
+    "answer": "string",
+    "distractors": ["string", "string", "string"]
+  },
+  "question4": {
+    "question": "string",
+    "answer": "string",
+    "distractors": ["string", "string", "string"]
+  },
+  "question5": {
     "question": "string",
     "answer": "string",
     "distractors": ["string", "string", "string"]
@@ -132,26 +142,49 @@ const TOPICS = loadTopics();
 
 // Main function to generate a passage and questions
 function generateDailyLifeTextChainPassage(topic, outputRow) {
+  const executionId = Utilities.getUuid();
+  Logger.log("[" + executionId + "] START: Generating passage for topic: '" + topic + "' at row " + outputRow);
+  
   const sheet = getSheetByGid(CONFIG['TARGET_SHEET_GID']);
   if (!sheet) {
-    Logger.log("Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found.");
+    Logger.log("[" + executionId + "] Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found.");
     return;
   }
-  Logger.log("Generating passage for topic: " + topic);
 
   const questionTypes = getQuestionTypes();
   // Genre is not directly used for text chain, but kept for consistency if needed elsewhere
   const genre = 'text chain'; 
 
-  const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2]);
+  const apiStartTime = new Date();
+  Logger.log("[" + executionId + "] Calling AI API at " + apiStartTime.toISOString());
+  
+  const generatedContent = generatePassageWithAI(topic, genre, questionTypes[0], questionTypes[1], questionTypes[2], questionTypes[3], questionTypes[4]);
+  
+  const apiEndTime = new Date();
+  const apiDuration = (apiEndTime - apiStartTime) / 1000;
+  Logger.log("[" + executionId + "] API call completed in " + apiDuration + " seconds");
+  Logger.log("[" + executionId + "] AI-generated content for topic '" + topic + "': " + (generatedContent ? generatedContent.substring(0, 100) + "..." : "NULL"));
+  
   if (!generatedContent) {
+    Logger.log("[" + executionId + "] ERROR: Failed to generate content from AI for topic: " + topic + ". The AI returned a null or empty response.");
+    
+    // Check if the row already has content - if so, don't overwrite it!
+    const existingPassage = sheet.getRange(outputRow, 2).getValue();
+    if (existingPassage && existingPassage.length > 0 && !existingPassage.startsWith("Error:") && !existingPassage.startsWith("[Missing")) {
+      Logger.log("[" + executionId + "] WARNING: Row " + outputRow + " already has content. Skipping error write to prevent overwriting good data.");
+      return;
+    }
+    
     sheet.getRange(outputRow, 2).setValue("Error: Failed to generate content");
     return;
   }
 
   // Assuming the AI returns content in a structured format, e.g., JSON string
   try {
+    Logger.log("[" + executionId + "] Parsing JSON response...");
     const content = JSON.parse(generatedContent);
+    
+    Logger.log("[" + executionId + "] Writing to row " + outputRow + "...");
     sheet.getRange(outputRow, 1).setValue(topic);
     sheet.getRange(outputRow, 2).setValue(content.passage || "[Missing Passage]");
 
@@ -179,35 +212,85 @@ function generateDailyLifeTextChainPassage(topic, outputRow) {
       sheet.getRange(outputRow, 13).setValue("[Missing Question 3]");
     }
 
+    if (content.question4) {
+      sheet.getRange(outputRow, 18).setValue(content.question4.question || "[Missing Question 4]");
+      sheet.getRange(outputRow, 19).setValue(content.question4.answer || "[Missing Answer 4]");
+      sheet.getRange(outputRow, 20, 1, 3).setValues([content.question4.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+    } else {
+      sheet.getRange(outputRow, 18).setValue("[Missing Question 4]");
+    }
+
+    if (content.question5) {
+      sheet.getRange(outputRow, 23).setValue(content.question5.question || "[Missing Question 5]");
+      sheet.getRange(outputRow, 24).setValue(content.question5.answer || "[Missing Answer 5]");
+      sheet.getRange(outputRow, 25, 1, 3).setValues([content.question5.distractors || ["[Missing]", "[Missing]", "[Missing]"]]);
+    } else {
+      sheet.getRange(outputRow, 23).setValue("[Missing Question 5]");
+    }
+
   } catch (e) {
-    Logger.log("Error parsing AI response: " + e.toString());
+    Logger.log("[" + executionId + "] ERROR parsing AI response: " + e.toString());
+    Logger.log("[" + executionId + "] Content that failed to parse: " + generatedContent);
+    
+    // Check if the row already has content before overwriting
+    const existingPassage = sheet.getRange(outputRow, 2).getValue();
+    if (existingPassage && existingPassage.length > 0 && !existingPassage.startsWith("Error:") && !existingPassage.startsWith("[Missing")) {
+      Logger.log("[" + executionId + "] WARNING: Row " + outputRow + " already has content. Skipping error write to prevent overwriting good data.");
+      return;
+    }
+    
     sheet.getRange(outputRow, 2).setValue("Error: Could not parse AI response.");
   }
 
-  Logger.log("Passage generation completed for row " + outputRow);
+  const totalEndTime = new Date();
+  Logger.log("[" + executionId + "] COMPLETE: Passage generation completed for row " + outputRow);
 }
 
-// Generate passage using the selected LLM
-function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type) {
-  const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type);
-  const provider = CONFIG.MODEL_PROVIDER;
-
-  if (provider === "OpenAI") {
-    return callOpenAI(prompt);
-  } else if (provider === "Anthropic") {
-    return callAnthropic(prompt);
-  } else if (provider === "Google") {
-    return callGoogle(prompt);
-  } else {
-    Logger.log("Error: Invalid model provider specified in Config sheet.");
-    return null;
+// Generate passage using gpt-5-mini with retry logic
+function generatePassageWithAI(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type) {
+  const maxRetries = 2;
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    if (attempt > 1) {
+      Logger.log("Retry attempt " + attempt + " of " + maxRetries + " after waiting 3 seconds...");
+      Utilities.sleep(3000); // Wait 3 seconds before retry
+    }
+    
+    try {
+      const result = attemptAPICall(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type);
+      if (result) {
+        if (attempt > 1) {
+          Logger.log("SUCCESS on retry attempt " + attempt);
+        }
+        return result;
+      }
+      lastError = "API returned null or empty response";
+    } catch (error) {
+      lastError = error.toString();
+      Logger.log("Attempt " + attempt + " failed: " + lastError);
+      
+      // If it's a timeout or address unavailable error, retry
+      if (lastError.includes("Address unavailable") || lastError.includes("timeout")) {
+        continue;
+      } else {
+        // For other errors, don't retry
+        Logger.log("Non-retryable error encountered. Stopping retry attempts.");
+        break;
+      }
+    }
   }
+  
+  Logger.log("All retry attempts failed. Last error: " + lastError);
+  return null;
 }
 
-// Helper function to call the OpenAI API
-function callOpenAI(prompt) {
+// Helper function to make a single API call attempt
+function attemptAPICall(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type) {
+  const prompt = buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type);
+
   const payload = {
-    model: CONFIG.OPENAI_MODEL,
+    model: CONFIG['MODEL'],
     messages: [
       {
         role: "system",
@@ -218,146 +301,45 @@ function callOpenAI(prompt) {
         content: prompt
       }
     ],
-    temperature: CONFIG.TEMPERATURE,
-    max_completion_tokens: CONFIG.MAX_COMPLETION_TOKENS
+    temperature: CONFIG['TEMPERATURE'],
+    max_completion_tokens: CONFIG['MAX_COMPLETION_TOKENS']
   };
 
-  try {
-    const response = UrlFetchApp.fetch(CONFIG.OPENAI_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + CONFIG.API_KEY
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
+  Logger.log("Payload sent to OpenAI API: " + JSON.stringify(payload));
 
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
+  const response = UrlFetchApp.fetch(CONFIG['OPENAI_URL'], {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + CONFIG['API_KEY']
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true // Add this to get full error response
+  });
 
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
+  const responseText = response.getContentText();
+  Logger.log("Raw API Response: " + responseText);
 
-    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-      return data.choices[0].message.content.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
+  const data = JSON.parse(responseText);
 
-  } catch (error) {
-    Logger.log("Error calling OpenAI: " + error.toString());
+  if (data.error) {
+    Logger.log("API Error: " + data.error.message);
     return null;
   }
-}
 
-// Helper function to call the Anthropic API
-function callAnthropic(prompt) {
-  const payload = {
-    model: CONFIG.ANTHROPIC_MODEL,
-    messages: [
-      {
-        role: "user",
-        content: prompt
-      }
-    ],
-    temperature: CONFIG.TEMPERATURE,
-    max_tokens: CONFIG.MAX_COMPLETION_TOKENS
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(CONFIG.ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": CONFIG.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
-
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
-
-    if (data.content && data.content.length > 0 && data.content[0].text) {
-      return data.content[0].text.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error calling Anthropic: " + error.toString());
-    return null;
-  }
-}
-
-// Helper function to call the Google API
-function callGoogle(prompt) {
-  const payload = {
-    contents: [
-      {
-        parts: [
-          {
-            text: prompt
-          }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: CONFIG.TEMPERATURE,
-      maxOutputTokens: CONFIG.MAX_COMPLETION_TOKENS
-    }
-  };
-
-  try {
-    const response = UrlFetchApp.fetch(`${CONFIG.GOOGLE_URL}${CONFIG.GOOGLE_MODEL}:generateContent?key=${CONFIG.GOOGLE_API_KEY}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const responseText = response.getContentText();
-    const data = JSON.parse(responseText);
-
-    if (data.error) {
-      Logger.log("API Error: " + data.error.message);
-      return null;
-    }
-
-    if (data.candidates && data.candidates.length > 0 && data.candidates[0].content.parts[0].text) {
-      return data.candidates[0].content.parts[0].text.trim();
-    } else {
-      Logger.log("Unexpected API response structure: " + responseText);
-      return null;
-    }
-
-  } catch (error) {
-    Logger.log("Error calling Google: " + error.toString());
+  if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+    return data.choices[0].message.content.trim();
+  } else {
+    Logger.log("Unexpected API response structure: " + responseText);
     return null;
   }
 }
 
 // Build the detailed prompt for passage generation
-function buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type) {
+function buildPassagePrompt(topic, genre, question1_type, question2_type, question3_type, question4_type, question5_type) {
   let prompt = CONFIG['User Prompt Template'] || ''; // Fallback to empty string
+  // Only substitute {topic} as question types are now fixed in the prompt template
   prompt = prompt.replace(/{topic}/g, topic);
-  prompt = prompt.replace(/{genre}/g, genre);
-  prompt = prompt.replace(/{question1_type}/g, question1_type);
-  prompt = prompt.replace(/{question2_type}/g, question2_type);
-  prompt = prompt.replace(/{question3_type}/g, question3_type);
   return prompt;
 }
 
@@ -365,12 +347,12 @@ function getQuestionTypes() {
   const sheet = getSheetByGid(CONFIG['TARGET_SHEET_GID']);
   if (!sheet) {
     Logger.log("Error: Target sheet with GID " + CONFIG['TARGET_SHEET_GID'] + " not found. Using default question types.");
-    return ['Factual Info', 'Factual Info', 'Factual Info'];
+    return ['Factual Info', 'Factual Info', 'Factual Info', 'Inference', 'Inference'];
   }
   const mode = sheet.getRange('D1').getValue();
 
   if (mode && mode !== "General Distribution") {
-    return [mode, mode, mode];
+    return [mode, mode, mode, mode, mode];
   }
 
   // General Distribution Logic
@@ -381,41 +363,96 @@ function getQuestionTypes() {
     { type: 'Inference', weightConfigKey: 'Inference Question %' }
   ];
 
-  let q1, q2, q3;
+  let q1, q2, q3, q4, q5;
+  let usedNegativeFactual = false;
+  let usedGistPurpose = false;
 
   // Determine Question 1 (Gist Purpose has a higher chance of being first)
   const rand1 = Math.random();
   if (rand1 < CONFIG['Gist Purpose Question %']) {
     q1 = 'Gist Purpose';
+    usedGistPurpose = true;
   } else {
     q1 = getRandomType(questionTypes.filter(t => t.type !== 'Gist Purpose')); // Select from others
   }
+  
+  if (q1 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
 
-  // Determine Question 2 and 3, respecting constraints
+  // Determine Question 2
   let availableTypesForQ2 = questionTypes.filter(t => t.type !== 'Gist Content'); // Gist Content is omitted
   
   // Ensure Negative Factual Info appears at most once
-  if (q1 === 'Negative Factual Info') {
+  if (usedNegativeFactual) {
     availableTypesForQ2 = availableTypesForQ2.filter(t => t.type !== 'Negative Factual Info');
+  }
+  
+  // Ensure Gist Purpose appears at most once
+  if (usedGistPurpose) {
+    availableTypesForQ2 = availableTypesForQ2.filter(t => t.type !== 'Gist Purpose');
   }
 
   q2 = getRandomType(availableTypesForQ2);
+  
+  if (q2 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
+  if (q2 === 'Gist Purpose') {
+    usedGistPurpose = true;
+  }
 
-  let availableTypesForQ3 = availableTypesForQ2.filter(t => t.type !== q2); // Remove Q2 type from consideration for Q3
-
-  // If Q1 or Q2 is Negative Factual Info, remove it from Q3 options
-  if (q1 === 'Negative Factual Info' || q2 === 'Negative Factual Info') {
+  // Determine Question 3
+  let availableTypesForQ3 = questionTypes.filter(t => t.type !== 'Gist Content');
+  
+  if (usedNegativeFactual) {
     availableTypesForQ3 = availableTypesForQ3.filter(t => t.type !== 'Negative Factual Info');
   }
-  
-  // If Q1 or Q2 is Gist Purpose, remove it from Q3 options
-  if (q1 === 'Gist Purpose' || q2 === 'Gist Purpose') {
+  if (usedGistPurpose) {
     availableTypesForQ3 = availableTypesForQ3.filter(t => t.type !== 'Gist Purpose');
   }
 
   q3 = getRandomType(availableTypesForQ3);
   
-  return [q1, q2, q3];
+  if (q3 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
+  if (q3 === 'Gist Purpose') {
+    usedGistPurpose = true;
+  }
+
+  // Determine Question 4
+  let availableTypesForQ4 = questionTypes.filter(t => t.type !== 'Gist Content');
+  
+  if (usedNegativeFactual) {
+    availableTypesForQ4 = availableTypesForQ4.filter(t => t.type !== 'Negative Factual Info');
+  }
+  if (usedGistPurpose) {
+    availableTypesForQ4 = availableTypesForQ4.filter(t => t.type !== 'Gist Purpose');
+  }
+
+  q4 = getRandomType(availableTypesForQ4);
+  
+  if (q4 === 'Negative Factual Info') {
+    usedNegativeFactual = true;
+  }
+  if (q4 === 'Gist Purpose') {
+    usedGistPurpose = true;
+  }
+
+  // Determine Question 5
+  let availableTypesForQ5 = questionTypes.filter(t => t.type !== 'Gist Content');
+  
+  if (usedNegativeFactual) {
+    availableTypesForQ5 = availableTypesForQ5.filter(t => t.type !== 'Negative Factual Info');
+  }
+  if (usedGistPurpose) {
+    availableTypesForQ5 = availableTypesForQ5.filter(t => t.type !== 'Gist Purpose');
+  }
+
+  q5 = getRandomType(availableTypesForQ5);
+  
+  return [q1, q2, q3, q4, q5];
 }
 
 function getRandomType(types) {
@@ -450,7 +487,16 @@ function startBatchProcess() {
   const batchSize = sheet.getRange('B1').getValue() || 5;
   
   // Clear any existing triggers to prevent duplicates
-  stopBatchProcess(); 
+  Logger.log('Cleaning up any existing triggers before starting...');
+  const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
+  for (let i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'processBatchChunk') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
+    }
+  }
+  Logger.log('Deleted ' + deletedCount + ' existing trigger(s)');
   
   // Use PropertiesService to store the state
   const userProperties = PropertiesService.getUserProperties();
@@ -462,30 +508,78 @@ function startBatchProcess() {
       .timeBased()
       .everyMinutes(1)
       .create();
-      
-  SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 10 passages will be generated in the background every minute. You can close this sheet.');
+  
+  Logger.log('Created new trigger for batch processing');    
+  SpreadsheetApp.getUi().alert('Batch process started!\n\n' + 
+    (deletedCount > 0 ? 'Cleaned up ' + deletedCount + ' old trigger(s).\n' : '') +
+    'Generating ' + batchSize + ' passages total.\n' +
+    'Processing up to 3 passages per minute.\n\n' +
+    'You can close this sheet and the process will continue in the background.');
 }
 
-// Processes a chunk of up to 10 items from the batch. This function is run by the trigger.
+// Processes a chunk of up to 3 items from the batch. This function is run by the trigger.
 function processBatchChunk() {
-  const userProperties = PropertiesService.getUserProperties();
-  let index = parseInt(userProperties.getProperty('batchIndex'), 10);
-  const size = parseInt(userProperties.getProperty('batchSize'), 10);
-  const chunkSize = 10; // Process up to 10 passages per run
-
-  for (let i = 0; i < chunkSize && index < size; i++) {
-    // Generate one passage
-    generateSinglePassage();
-    
-    // Update the index for the next run
-    index++;
-    userProperties.setProperty('batchIndex', index.toString());
+  const lock = LockService.getScriptLock();
+  
+  // Try to acquire lock - if another instance is running, skip this execution
+  if (!lock.tryLock(1000)) { // Wait up to 1 second for lock
+    Logger.log("SKIPPED: Another batch chunk is already running. Exiting to prevent parallel execution.");
+    return;
   }
   
-  if (index >= size) {
-    // Batch is complete, so stop the process
-    stopBatchProcess();
-    Logger.log('Batch process completed and trigger has been removed.');
+  try {
+    const chunkStartTime = new Date();
+    Logger.log("=== BATCH CHUNK STARTING at " + chunkStartTime.toISOString() + " ===");
+    
+    const userProperties = PropertiesService.getUserProperties();
+    let index = parseInt(userProperties.getProperty('batchIndex'), 10);
+    const size = parseInt(userProperties.getProperty('batchSize'), 10);
+    const chunkSize = 3; // Process up to 3 passages per run (reduced from 10 to avoid timeouts)
+    const maxExecutionTime = 4 * 60 * 1000; // 4 minutes in milliseconds (leave 2 min buffer)
+
+    Logger.log("Batch status: " + index + " of " + size + " completed. Processing up to " + chunkSize + " more.");
+
+    for (let i = 0; i < chunkSize && index < size; i++) {
+      // Check if we're approaching the execution time limit
+      const elapsedTime = new Date() - chunkStartTime;
+      if (elapsedTime > maxExecutionTime) {
+        Logger.log("WARNING: Approaching execution time limit (" + (elapsedTime / 1000) + " seconds). Stopping this chunk early.");
+        break;
+      }
+      
+      Logger.log("--- Processing item " + (index + 1) + " of " + size + " (elapsed: " + (elapsedTime / 1000) + "s) ---");
+      
+      // Generate one passage
+      try {
+        generateSinglePassage();
+        
+        // Add a small delay between API calls to avoid rate limiting
+        if (i < chunkSize - 1 && index < size - 1) {
+          Logger.log("Waiting 2 seconds before next generation to avoid rate limiting...");
+          Utilities.sleep(2000); // 2 second delay
+        }
+      } catch (error) {
+        Logger.log("ERROR in batch processing item " + (index + 1) + ": " + error.toString());
+        // Continue to next item even if this one failed
+      }
+      
+      // Update the index for the next run
+      index++;
+      userProperties.setProperty('batchIndex', index.toString());
+    }
+    
+    const chunkEndTime = new Date();
+    const chunkDuration = (chunkEndTime - chunkStartTime) / 1000;
+    Logger.log("=== BATCH CHUNK COMPLETED in " + chunkDuration + " seconds ===");
+    
+    if (index >= size) {
+      // Batch is complete, so stop the process
+      stopBatchProcess();
+      Logger.log('Batch process completed and trigger has been removed.');
+    }
+  } finally {
+    // Always release the lock
+    lock.releaseLock();
   }
 }
 
@@ -493,16 +587,52 @@ function processBatchChunk() {
 function stopBatchProcess() {
   // Delete all triggers for this script
   const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
   for (let i = 0; i < triggers.length; i++) {
     if (triggers[i].getHandlerFunction() === 'processBatchChunk') {
       ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
     }
   }
+  
+  Logger.log('Deleted ' + deletedCount + ' processBatchChunk trigger(s)');
   
   // Clear the stored properties
   const userProperties = PropertiesService.getUserProperties();
   userProperties.deleteProperty('batchIndex');
   userProperties.deleteProperty('batchSize');
+  
+  if (deletedCount > 0) {
+    SpreadsheetApp.getUi().alert('Batch process stopped. Deleted ' + deletedCount + ' trigger(s).');
+  } else {
+    SpreadsheetApp.getUi().alert('No batch triggers found to delete.');
+  }
+}
+
+// EMERGENCY: Force stop ALL triggers and reset everything
+function forceStopAllTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let deletedCount = 0;
+  
+  Logger.log('Force stopping all triggers...');
+  
+  for (let i = 0; i < triggers.length; i++) {
+    try {
+      Logger.log('Deleting trigger: ' + triggers[i].getHandlerFunction());
+      ScriptApp.deleteTrigger(triggers[i]);
+      deletedCount++;
+    } catch (e) {
+      Logger.log('Error deleting trigger: ' + e.toString());
+    }
+  }
+  
+  // Clear all stored properties
+  const userProperties = PropertiesService.getUserProperties();
+  userProperties.deleteProperty('batchIndex');
+  userProperties.deleteProperty('batchSize');
+  
+  Logger.log('Force stopped ' + deletedCount + ' trigger(s)');
+  SpreadsheetApp.getUi().alert('FORCE STOP COMPLETE: Deleted ALL ' + deletedCount + ' trigger(s) and cleared properties.');
 }
 
 
@@ -515,7 +645,12 @@ function generateSinglePassage() {
   }
   const startRow = sheet.getRange('C1').getValue() || 5;
   const nextEmptyRow = Math.max(startRow, sheet.getLastRow() + 1);
+  
+  Logger.log("generateSinglePassage: Calculated nextEmptyRow = " + nextEmptyRow + " (startRow: " + startRow + ", lastRow: " + sheet.getLastRow() + ")");
+  
   const topic = getTopicFromSheet();
+  Logger.log("generateSinglePassage: Selected topic = '" + topic + "'");
+  
   generateDailyLifeTextChainPassage(topic, nextEmptyRow);
 }
 
@@ -552,6 +687,8 @@ function onOpen() {
     .addSeparator()
     .addItem('Start Batch Process', 'startBatchProcess')
     .addItem('Stop Batch Process', 'stopBatchProcess')
+    .addSeparator()
+    .addItem('⚠️ FORCE STOP ALL TRIGGERS', 'forceStopAllTriggers')
     .addToUi();
 }
 

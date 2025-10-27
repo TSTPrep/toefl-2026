@@ -100,11 +100,13 @@ function generateTOEFL2026Passage(topic, outputRow) {
     Logger.log(`Overall generation attempt ${attempts} for topic "${topic}"`);
     
     // Generate a passage that passes initial AI validation (word count, no lists)
-    const generatedText = generatePassageWithAI(topic);
+    const generatedText = generatePassageWithAI(topic, outputRow);
 
     if (generatedText) {
+      Logger.log("Generated Passage: " + generatedText);
       // Apply blanking and then validate the blank count
       const tempBlankedPassage = applyBlankingLogic(generatedText);
+      Logger.log("Result from applyBlankingLogic: " + tempBlankedPassage);
       const blankCount = countBlanks(tempBlankedPassage);
 
       if (blankCount === CONFIG.BLANKS_COUNT) {
@@ -137,7 +139,7 @@ function generateTOEFL2026Passage(topic, outputRow) {
 }
 
 // Generate passage using the selected LLM with validation and retries
-function generatePassageWithAI(topic) {
+function generatePassageWithAI(topic, outputRow) {
   let passage = null;
   let attempts = 0;
   const maxAttempts = 3;
@@ -145,7 +147,7 @@ function generatePassageWithAI(topic) {
   while (attempts < maxAttempts && !passage) {
     attempts++;
     Logger.log(`Generating passage... Attempt ${attempts}`);
-    const generatedText = callLLM(topic);
+    const generatedText = callLLM(topic, outputRow);
 
     if (generatedText && validatePassage(generatedText)) {
       passage = generatedText;
@@ -165,15 +167,29 @@ function generatePassageWithAI(topic) {
 }
 
 // Helper function to call the appropriate LLM API based on the configuration
-function callLLM(topic) {
+function callLLM(topic, outputRow) {
   const provider = CONFIG.MODEL_PROVIDER;
 
+  // 1. Build the base prompt
+  let prompt = buildPassagePrompt(topic);
+
+  // 2. Get passage history
+  const history = getPassageHistory(outputRow);
+
+  // 3. Augment the prompt with history if available
+  if (history.length > 0) {
+    const historySection = "Here are the last few passages that were generated. Please generate a new passage with a different sentence structure and style to ensure variety:\n\n" + history.map((p, i) => `Previous Passage ${i + 1}:\n${p}`).join('\\n\\n');
+    prompt = `${prompt}\\n\\n${historySection}`;
+  }
+
+  Logger.log("Final prompt sent to API: " + prompt);
+
   if (provider === "OpenAI") {
-    return callOpenAI(topic);
+    return callOpenAI(prompt);
   } else if (provider === "Anthropic") {
-    return callAnthropic(topic);
+    return callAnthropic(prompt);
   } else if (provider === "Google") {
-    return callGoogle(topic);
+    return callGoogle(prompt);
   } else {
     Logger.log("Error: Invalid model provider specified in Config sheet.");
     return null;
@@ -181,9 +197,7 @@ function callLLM(topic) {
 }
 
 // Helper function to call the OpenAI API
-function callOpenAI(topic) {
-  const prompt = buildPassagePrompt(topic);
-
+function callOpenAI(prompt) {
   const payload = {
     model: CONFIG.OPENAI_MODEL,
     messages: [
@@ -233,9 +247,7 @@ function callOpenAI(topic) {
 }
 
 // Helper function to call the Anthropic API
-function callAnthropic(topic) {
-  const prompt = buildPassagePrompt(topic);
-
+function callAnthropic(prompt) {
   const payload = {
     model: CONFIG.ANTHROPIC_MODEL,
     messages: [
@@ -282,9 +294,7 @@ function callAnthropic(topic) {
 }
 
 // Helper function to call the Google API
-function callGoogle(topic) {
-  const prompt = buildPassagePrompt(topic);
-
+function callGoogle(prompt) {
   const payload = {
     contents: [
       {
@@ -332,6 +342,74 @@ function callGoogle(topic) {
   }
 }
 
+// Function to split a passage into sentences using AI
+function splitSentencesWithAI(passage) {
+  const payload = {
+    model: CONFIG.OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: "You are a sentence splitter. Your task is to split the provided text into sentences. Respond with a JSON array of strings, where each string is a sentence. For example, for the input \"Hello world. How are you?\", you should respond with [\"Hello world.\", \"How are you?\"]. Do not add any explanation."
+      },
+      {
+        role: "user",
+        content: passage
+      }
+    ],
+    temperature: 1,
+    max_completion_tokens: CONFIG.MAX_COMPLETION_TOKENS
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(CONFIG.OPENAI_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + CONFIG.API_KEY
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const responseText = response.getContentText();
+    const data = JSON.parse(responseText);
+
+    if (data.error) {
+      Logger.log("API Error in splitSentencesWithAI: " + data.error.message);
+      return null;
+    }
+
+    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+      const content = data.choices[0].message.content.trim();
+      try {
+        const sentences = JSON.parse(content);
+        if (Array.isArray(sentences) && sentences.every(s => typeof s === 'string')) {
+          return sentences;
+        }
+      } catch (e) {
+        // If direct parsing fails, try to extract from a markdown block
+        const jsonMatch = content.match(/\[.*\]/s);
+        if (jsonMatch) {
+          try {
+            const sentences = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(sentences) && sentences.every(s => typeof s === 'string')) {
+              return sentences;
+            }
+          } catch (e2) {
+            Logger.log("Could not parse sentences from API response after regex match: " + jsonMatch[0]);
+          }
+        }
+      }
+      Logger.log("Could not find a valid JSON array in API response: " + content);
+    } else {
+      Logger.log("Unexpected API response structure in splitSentencesWithAI: " + responseText);
+    }
+  } catch (error) {
+    Logger.log("Error calling OpenAI in splitSentencesWithAI: " + error.toString());
+  }
+  return null; // Return null if anything fails
+}
+
 // Build the detailed prompt for passage generation
 function buildPassagePrompt(topic) {
   // Assemble the prompt from the configuration sheet
@@ -367,7 +445,15 @@ function validatePassage(passage) {
 
 // Apply blanking logic to the generated passage
 function applyBlankingLogic(passage) {
-  const sentences = passage.match(/[^.!?]+[.!?]+/g) || [];
+  let sentences = splitSentencesWithAI(passage);
+  Logger.log("LLM Sentence Splitting Result: " + JSON.stringify(sentences));
+  
+  if (!sentences) {
+    Logger.log("Warning: Failed to split sentences using AI. Blanking may not be accurate. Falling back to regex.");
+    // Fallback to regex if AI fails
+    sentences = passage.match(/[^.!?]+[.!?]+/g) || [];
+  }
+
   if (sentences.length < 3) {
     Logger.log("Warning: Passage has fewer than 3 sentences, cannot apply blanking as specified.");
     return passage;
@@ -381,31 +467,46 @@ function applyBlankingLogic(passage) {
   let secondSentenceWords = secondSentence.trim().split(/\s+/);
   let thirdSentenceWords = thirdSentence.trim().split(/\s+/);
 
-  const blanksInSecond = 7;
-  const blanksInThird = 3;
+  const combinedWords = [...secondSentenceWords, ...thirdSentenceWords];
+  const totalBlanksNeeded = 10;
+  let blanksPlaced = 0;
 
-  for (let i = 0; i < secondSentenceWords.length && i < blanksInSecond; i++) {
-    secondSentenceWords[i] = createBlank(secondSentenceWords[i]);
+  for (let i = 0; i < combinedWords.length && blanksPlaced < totalBlanksNeeded; i++) {
+    if (i % 2 === 0) { // Blank every second word (even indices)
+      combinedWords[i] = createBlank(combinedWords[i]);
+      blanksPlaced++;
+    }
   }
 
-  for (let i = 0; i < thirdSentenceWords.length && i < blanksInThird; i++) {
-    thirdSentenceWords[i] = createBlank(thirdSentenceWords[i]);
-  }
+  // Reconstruct the sentences from the combined list
+  const newSecondSentenceWords = combinedWords.slice(0, secondSentenceWords.length);
+  const newThirdSentenceWords = combinedWords.slice(secondSentenceWords.length);
 
   return [
     firstSentence.trim(),
-    secondSentenceWords.join(" "),
-    thirdSentenceWords.join(" "),
+    newSecondSentenceWords.join(" "),
+    newThirdSentenceWords.join(" "),
     remainingSentences.trim()
   ].join(" ").trim();
 }
 
-// Create a blank from a word (second half deleted)
+// Create a blank from a word (second half wrapped in braces)
 function createBlank(word) {
   if (word.length < 2) return word;
 
-  const midPoint = Math.ceil(word.length / 2);
-  return word.substring(0, midPoint) + "{missing}";
+  // Preserve trailing punctuation
+  const punctuationRegex = /[.,!?;:]$/;
+  const match = word.match(punctuationRegex);
+  const punctuation = match ? match[0] : '';
+  const wordStem = punctuation ? word.slice(0, -1) : word;
+
+  // After removing punctuation, the word stem might be too short to blank.
+  if (wordStem.length < 2) return word; 
+
+  const midPoint = Math.ceil(wordStem.length / 2);
+  const firstHalf = wordStem.substring(0, midPoint);
+  const secondHalf = wordStem.substring(midPoint);
+  return firstHalf + "{" + secondHalf + "}" + punctuation;
 }
 
 // Utility functions
@@ -414,24 +515,46 @@ function countWords(text) {
 }
 
 function countBlanks(text) {
-  return (text.match(/\{missing\}/g) || []).length;
+  return (text.match(/{.*?}/g) || []).length;
+}
+
+// Shows a UI alert if possible, otherwise logs the message.
+function showAlert(message) {
+  try {
+    SpreadsheetApp.getUi().alert(message);
+  } catch (e) {
+    // This will happen if the script is run in a context without a UI, like a trigger.
+    Logger.log("Could not show alert: " + message);
+  }
+}
+
+// Fetches the last 10 passages from the sheet to provide as context.
+function getPassageHistory(currentRow) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const startRow = Math.max(2, currentRow - 10); // Start from row 2 at minimum
+  const numRows = currentRow - startRow;
+
+  if (numRows <= 0) {
+    return [];
+  }
+
+  const range = sheet.getRange(startRow, 2, numRows, 1); // Column B for Original Passage
+  const values = range.getValues();
+
+  // Flatten the 2D array and filter out any empty or non-string values
+  return values.flat().filter(passage => typeof passage === 'string' && passage.trim() !== '');
 }
 
 // --- Trigger-Based Batch Processing ---
 
 // Starts the batch generation process by setting up a time-driven trigger.
 function startBatchProcess() {
-  const userProperties = PropertiesService.getUserProperties();
-  if (userProperties.getProperty('batchIndex')) {
-    SpreadsheetApp.getUi().alert('A batch process is already running. Please wait for it to complete or stop it manually before starting a new one.');
-    return;
-  }
-
+  // Always clear any existing triggers and properties to ensure a clean start.
+  stopBatchProcess(true); // Pass true to suppress the "stopped" message
+  
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   const batchSize = sheet.getRange('B1').getValue() || 5;
-  
-  // Clear any existing triggers to prevent duplicates
-  stopBatchProcess(); 
+  const userProperties = PropertiesService.getUserProperties();
   
   // Use PropertiesService to store the state
   userProperties.setProperty('batchIndex', '0');
@@ -443,7 +566,7 @@ function startBatchProcess() {
       .everyMinutes(1)
       .create();
       
-  SpreadsheetApp.getUi().alert('Batch process started. Chunks of up to 10 passages will be generated in the background every minute. You can close this sheet.');
+  showAlert('Batch process started. Chunks of up to 10 passages will be generated in the background every minute. You can close this sheet.');
 }
 
 // Processes a chunk of up to 10 items from the batch. This function is run by the trigger.
@@ -491,7 +614,7 @@ function processBatchChunk() {
 }
 
 // Stops the batch process by deleting the trigger and clearing properties.
-function stopBatchProcess() {
+function stopBatchProcess(suppressMessage = false) {
   // Delete all triggers for this script
   const triggers = ScriptApp.getProjectTriggers();
   for (let i = 0; i < triggers.length; i++) {
@@ -504,6 +627,10 @@ function stopBatchProcess() {
   const userProperties = PropertiesService.getUserProperties();
   userProperties.deleteProperty('batchIndex');
   userProperties.deleteProperty('batchSize');
+
+  if (!suppressMessage) {
+    showAlert('Batch process stopped.');
+  }
 }
 
 
