@@ -11,7 +11,8 @@ echo ""
 
 # Configuration
 PROJECT_DIR="/home/blackthorne/Work/tstprep.com/toefl-2026/audio-file-extraction"
-HF_TOKEN="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"
+# Load HF_TOKEN from .env file (contains: HF_TOKEN=your_token_here)
+source .env 2>/dev/null || { echo "Error: .env file not found. Create it with HF_TOKEN=your_token"; exit 1; }
 
 cd "$PROJECT_DIR"
 

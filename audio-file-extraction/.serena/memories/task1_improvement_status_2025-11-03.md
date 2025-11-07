@@ -16,7 +16,7 @@
   - pyannote.audio 4.0.1
   - PyTorch 2.9.0 with CUDA support
   - torchaudio, librosa, pydub, scipy, numpy
-- HuggingFace token configured: `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`
+- HuggingFace token configured: `[REDACTED - See .env file]`
 - ffmpeg/ffprobe confirmed at `/usr/bin/`
 
 #### 3. API Compatibility Fixed
@@ -93,7 +93,7 @@ When resuming after model access is granted:
 ```bash
 cd /home/blackthorne/Work/tstprep.com/toefl-2026/audio-file-extraction
 source venv/bin/activate
-export HF_TOKEN=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
+export HF_TOKEN=[your_token_from_.env]
 ./READY_TO_RUN.sh
 ```
 
@@ -104,7 +104,7 @@ cd /home/blackthorne/Work/tstprep.com/toefl-2026/audio-file-extraction
 source venv/bin/activate
 
 # 2. Set token
-export HF_TOKEN=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
+export HF_TOKEN=[your_token_from_.env]
 
 # 3. Verify setup (should now pass all checks)
 python test_setup.py
@@ -156,7 +156,7 @@ python simple_audio_check.py output/statements/
 source venv/bin/activate
 
 # Set token (always needed for speaker detection)
-export HF_TOKEN=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
+export HF_TOKEN=[your_token_from_.env]
 
 # Verify setup
 python test_setup.py
