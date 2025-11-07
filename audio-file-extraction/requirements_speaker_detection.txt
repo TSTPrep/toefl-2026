@@ -1,0 +1,19 @@
+# Speaker Detection Requirements
+# Install with: pip install -r requirements_speaker_detection.txt
+
+# Core dependencies
+pyannote.audio>=3.1.0
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Alternative: Lightweight speaker detection
+# resemblyzer>=0.1.1.dev0
+
+# Audio processing
+pydub>=0.25.1
+librosa>=0.10.0
+soundfile>=0.12.1
+
+# Utilities
+numpy>=1.24.0
+scipy>=1.10.0

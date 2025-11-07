@@ -1,0 +1,24 @@
+# Google Drive API
+google-api-python-client==2.147.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
+
+# Audio Processing
+pydub==0.25.1
+
+# Environment Management
+python-dotenv==1.0.1
+
+# Utilities
+tqdm==4.66.5
+colorama==0.4.6
+
+# Testing
+pytest==8.3.3
+pytest-mock==3.14.0
+pytest-cov==5.0.0
+
+# Development
+black==24.8.0
+flake8==7.1.1
+mypy==1.11.2
